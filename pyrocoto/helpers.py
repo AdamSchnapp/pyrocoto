@@ -3,6 +3,7 @@ from xml.etree.ElementTree import tostring
 from xml.dom import minidom
 import re
 
+
 def _name_of_func(func):
     assert func is not None
     return func.__name__
@@ -44,6 +45,7 @@ def traverse_modify(obj, path=None, action_func=None):
             value = obj
         return value
 
+
 def modify_tree_nodes(obj, action_func):
     if isinstance(obj, dict):
         try:
@@ -64,16 +66,19 @@ def modify_tree_nodes(obj, action_func):
             return obj
     return obj
 
+
 def prettify(elem):
     rough_string = tostring(elem, 'UTF-8')
     reparsed = minidom.parseString(rough_string)
     return reparsed.toprettyxml(indent="    ",encoding=None)
+
 
 def groupattr(x):
     try:
         return x.group
     except:
         return x
+
 
 def validate_cycle_def(cycdef):
     start_stop_step = re.compile(r'\d{12} \d{12} \d{2}:\d{2}:\d{2}')

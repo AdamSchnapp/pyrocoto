@@ -18,4 +18,3 @@ setup(
     download_url="{}/tarball/{}".format(url, version),
     license="MIT"
 )
-
