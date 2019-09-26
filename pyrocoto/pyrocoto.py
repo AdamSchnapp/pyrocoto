@@ -30,15 +30,23 @@ class CycleDefinition():
 
 
 def cyclestr(element, offset=None):
+    ''' Wrap text elements containing '@' for syclestr information with cyclestr tag '''
+    if element.text is None:
+        raise ValueError('passed element does not have text')
     if '@' in element.text:
         text = element.text
         element.text = None
         if offset is not None:
+            if not isinstance(offset, str):
+                raise ValueError('offset passed must be of type str'+str(type(offset)))
             cyclestr_element = Element('cyclestr', offset=offset)
         else:
             cyclestr_element = Element('cyclestr')
         cyclestr_element.text = text
         element.append(cyclestr_element)
+    else:
+        if offset is not None:
+            raise ValueError("offset was passed but no '@' in element.text")
     return element
 
 
