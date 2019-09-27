@@ -5,6 +5,9 @@ from .helpers import _name_of_func, groupattr, modify_tree_nodes
 from collections import OrderedDict
 import inspect
 import copy
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CycleDefinition():
@@ -15,7 +18,7 @@ class CycleDefinition():
         self.activation_offset = str(activation_offset)
 
     def __repr__(self):
-        return self.group
+        return "CycleDefinition({!r})".format(self.__dict__) 
 
     def __eq__(self, other):
         if isinstance(other, CycleDefinition):
@@ -31,6 +34,8 @@ class CycleDefinition():
 
 def cyclestr(element, offset=None):
     ''' Wrap text elements containing '@' for syclestr information with cyclestr tag '''
+    if not isinstance(element, Element):
+        raise ValueError('element passed must be of type Element')
     if element.text is None:
         raise ValueError('passed element does not have text')
     if '@' in element.text:
@@ -38,7 +43,7 @@ def cyclestr(element, offset=None):
         element.text = None
         if offset is not None:
             if not isinstance(offset, str):
-                raise ValueError('offset passed must be of type str'+str(type(offset)))
+                raise ValueError('offset passed must be of type str but was '+str(type(offset)))
             cyclestr_element = Element('cyclestr', offset=offset)
         else:
             cyclestr_element = Element('cyclestr')

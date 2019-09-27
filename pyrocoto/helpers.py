@@ -8,23 +8,23 @@ def _name_of_func(func):
     assert func is not None
     return func.__name__
 
-def traverse(obj, path=None, callback=None):
-    if path is None:
-        path = []
-
-    if isinstance(obj, dict):
-        value = {k: traverse(v, path + [k], callback)
-                 for k, v in obj.items()}
-    elif isinstance(obj, list):
-        value = [traverse(elem, path + [[]], callback)
-                 for elem in obj]
-    else:
-        value = obj
-
-    if callback is None:  # if a callback is provided, call it to get the new value
-        return value
-    else:
-        return callback(path, value)
+#def traverse(obj, path=None, callback=None):
+#    if path is None:
+#        path = []
+#
+#    if isinstance(obj, dict):
+#        value = {k: traverse(v, path + [k], callback)
+#                 for k, v in obj.items()}
+#    elif isinstance(obj, list):
+#        value = [traverse(elem, path + [[]], callback)
+#                 for elem in obj]
+#    else:
+#        value = obj
+#
+#    if callback is None:  # if a callback is provided, call it to get the new value
+#        return value
+#    else:
+#        return callback(path, value)
 
 
 def traverse_modify(obj, path=None, action_func=None):
