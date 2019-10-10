@@ -55,19 +55,19 @@ def cyclestr(element, offset=None):
     return element
 
 
-class Singleton(type):
-    def __init__(cls, name, bases, dic):
-        super(Singleton, cls).__init__(name, bases, dic)
-        cls.instance = None
-
-    def __call__(cls, *args, **kwargs):
-        if cls.instance is None:
-            cls.instance = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls.instance
+#class Singleton(type):
+#    def __init__(cls, name, bases, dic):
+#        super(Singleton, cls).__init__(name, bases, dic)
+#        cls.instance = None
+#
+#    def __call__(cls, *args, **kwargs):
+#        if cls.instance is None:
+#            cls.instance = super(Singleton, cls).__call__(*args, **kwargs)
+#        return cls.instance
 
 
 class Workflow(object):
-    __metaclass__ = Singleton
+#    __metaclass__ = Singleton
     ''' Implement an abstarction layer on top of rocoto workflow management engine
         The WorkFlow class will serve as a central object that registers all units of work
         (tasks) for any number of desired cycle definitions.
@@ -110,16 +110,18 @@ class Workflow(object):
         ''' register tasks in the workflows task registry'''
 
         if task is not None:
+            print(task)
             task.verify()
             task.meta_dict = meta
             task.metaname = metaname
 
             if groups is not None:
                 for group in groups:
-                    task.apply_group(group)
-                    task.task_group = group
+                    task_work = copy.deepcopy(task)
+                    task_work.apply_group(group)
+                    task_work.task_group = group
                     task_unique_name = group + '_' + task_name
-                    self.tasks[task_unique_name] = copy.deepcopy(vars(task))
+                    self.tasks[task_unique_name] = copy.deepcopy(vars(task_work))
             else:
                 self.tasks[task_name] = vars(task)
                 task.task_group = None
@@ -136,11 +138,15 @@ class Workflow(object):
         def decorator(func):
             task = func()
             metaname = None
-            try:
-                task_name = task['__taskname__']
+            if hasattr(task, '__taskname__'):
+                task_name = task.__taskname__
                 if meta is not None:
-                    metaname = _name_of_func(func)
-            except:
+                    #metaname = _name_of_func(func)
+                    metaname = task.__taskname__.replace('#','')
+                    for key in meta.keys():
+                        if key not in task_name:
+                            raise ValueError('var "{}" was not fount in __taskname__ as #{}#'.format(key,key))
+            else:
                 # let function name be task name
                 task_name = _name_of_func(func)
                 task.__taskname__ = task_name
