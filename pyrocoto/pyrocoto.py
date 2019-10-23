@@ -55,19 +55,25 @@ def cyclestr(element, offset=None):
     return element
 
 
-#class Singleton(type):
-#    def __init__(cls, name, bases, dic):
-#        super(Singleton, cls).__init__(name, bases, dic)
-#        cls.instance = None
-#
-#    def __call__(cls, *args, **kwargs):
-#        if cls.instance is None:
-#            cls.instance = super(Singleton, cls).__call__(*args, **kwargs)
-#        return cls.instance
+def get_setting(setting, config=configparser.ConfigParser(), section='default'):
+    # get or allow user to set setting stored in configfile
+    configfile = 'pyrocoto.ini'
+    if os.path.exists(configfile):
+        config.read(configfile)
+    if section not in config:
+        config[section] = {}
+
+    if setting in config[section]:
+        return config[section][setting]
+    else:
+        set = input('provide {} setting for {}:'.format(section,setting))
+        config[section][setting] = set
+        with open(configfile,'w') as f:
+            config.write(f)
+        return set
 
 
 class Workflow(object):
-#    __metaclass__ = Singleton
     ''' Implement an abstarction layer on top of rocoto workflow management engine
         The WorkFlow class will serve as a central object that registers all units of work
         (tasks) for any number of desired cycle definitions.
