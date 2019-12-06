@@ -55,23 +55,54 @@ def cyclestr(element, offset=None):
     return element
 
 
-#def get_setting(setting, config=configparser.ConfigParser(), section='default'):
-#    # get or allow user to set setting stored in configfile
-#    configfile = 'pyrocoto.ini'
-#    if os.path.exists(configfile):
-#        config.read(configfile)
-#    if section not in config:
-#        config[section] = {}
-#
-#    if setting in config[section]:
-#        return config[section][setting]
-#    else:
-#        set = input('provide {} setting for {}:'.format(section,setting))
-#        config[section][setting] = set
-#        with open(configfile,'w') as f:
-#            config.write(f)
-#        return set
-
+class Config():
+    '''Implement configuration creation and access'''
+    def __init__(self):
+        '''Use configuaration file in current directory over home/config/'''
+            
+        config_here = os.path.join(Path.cwd(),'pyrocoto.yaml')
+        config_home = os.path.join(Path.home(),'config','pyrocoto.yaml')
+        
+        config_prio = [config_here, config_home]
+        for config_file in config_prio:
+            if os.path.isfile(config_file):
+                with open(config_file, 'r') as f:
+                    self.config = yaml.full_load(f)
+                    self.config_file = config_file
+                return
+                
+        # no configfile was found; set up new configfile at home/config
+        self.config = {}
+        self.config_file = config_home
+        dirname = os.path.dirname(config_home)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+                
+    def set_settings(self, settings, section='default'):
+        for setting, value in settings.items():
+            if value is None:
+                value = input(f"Provide {section} setting for {setting}: ")
+            if section not in self.config:
+                self.config[section] = {}
+            self.config[section][setting] = value
+        print(self.config)
+        with open(self.config_file,'w') as f:
+            yaml.dump(self.config, f)
+                    
+    def get_setting(self, setting, section='default'):
+        '''This method iteratively calls itself until it errors or returns with setting'''
+        if section not in self.config:
+            if yes_or_no(f"{section} does not already exist; create it?"):
+                self.set_settings({setting:None}, section=section)
+                self.get_setting(setting,section)
+            else:
+                raise ValueError(f"section {section} does not exist and is not being created") # exit point
+        if setting in self.config[section]:
+            return self.config[section][setting]  # exit point
+        else:
+            self.set_settings({setting:None}, section)
+            self.get_setting(setting, section)
+        
 
 class Workflow(object):
     ''' Implement an abstarction layer on top of rocoto workflow management engine
