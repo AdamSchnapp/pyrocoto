@@ -1,6 +1,6 @@
 import pytest
 from xml.etree.ElementTree import Element, tostring
-from pyrocoto import cyclestr, CycleDefinition, Singleton 
+from pyrocoto import cyclestr, CycleDefinition 
 
 
 @pytest.fixture
@@ -41,12 +41,3 @@ def test_CycleDefinition_eq():
     assert C1 == C2
     C2 = CycleDefinition('hourly', '30 * * * * *', activation_offset='-15:00')
     assert C1 != C2
-
-def test_Singleton():
-    class Thing():
-        __metaclass__ = Singleton
-    thing1 = Thing()
-    thing2 = Thing()
-    assert thing1 is thing2
-
-

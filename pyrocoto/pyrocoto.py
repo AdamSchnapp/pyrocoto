@@ -55,22 +55,22 @@ def cyclestr(element, offset=None):
     return element
 
 
-def get_setting(setting, config=configparser.ConfigParser(), section='default'):
-    # get or allow user to set setting stored in configfile
-    configfile = 'pyrocoto.ini'
-    if os.path.exists(configfile):
-        config.read(configfile)
-    if section not in config:
-        config[section] = {}
-
-    if setting in config[section]:
-        return config[section][setting]
-    else:
-        set = input('provide {} setting for {}:'.format(section,setting))
-        config[section][setting] = set
-        with open(configfile,'w') as f:
-            config.write(f)
-        return set
+#def get_setting(setting, config=configparser.ConfigParser(), section='default'):
+#    # get or allow user to set setting stored in configfile
+#    configfile = 'pyrocoto.ini'
+#    if os.path.exists(configfile):
+#        config.read(configfile)
+#    if section not in config:
+#        config[section] = {}
+#
+#    if setting in config[section]:
+#        return config[section][setting]
+#    else:
+#        set = input('provide {} setting for {}:'.format(section,setting))
+#        config[section][setting] = set
+#        with open(configfile,'w') as f:
+#            config.write(f)
+#        return set
 
 
 class Workflow(object):
