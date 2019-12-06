@@ -90,3 +90,13 @@ def validate_cycle_def(cycdef):
         return True
     else:
         return False
+
+
+def yes_or_no(question):
+    while "not y or n response":
+        reply = str(input(question+' (y/n): ')).lower().strip()
+        if reply in ['y','yes']:
+            return True
+        if reply in ['n','no']:
+            return False
+
