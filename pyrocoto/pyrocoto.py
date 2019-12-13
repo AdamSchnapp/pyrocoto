@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 from xml.etree.ElementTree import Element, tostring
 from xml.dom import minidom
-from .helpers import _name_of_func, groupattr, modify_tree_nodes
+from .helpers import _name_of_func, groupattr, modify_tree_nodes, yes_or_no
 from collections import OrderedDict
 import inspect
 import copy
 import logging
+import os
+import yaml
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +88,6 @@ class Config():
             if section not in self.config:
                 self.config[section] = {}
             self.config[section][setting] = value
-        print(self.config)
         with open(self.config_file,'w') as f:
             yaml.dump(self.config, f)
                     
@@ -147,7 +149,6 @@ class Workflow(object):
         ''' register tasks in the workflows task registry'''
 
         if task is not None:
-            print(task)
             task.verify()
             task.meta_dict = meta
             task.metaname = metaname
@@ -186,7 +187,6 @@ class Workflow(object):
             else:
                 # let function name be task name
                 task_name = _name_of_func(func)
-                task.__taskname__ = task_name
                 if meta is not None:
                     print('__taskname__ must be used with a metatask')
                     raise ValueError
@@ -363,16 +363,27 @@ class Task():
     ''' Implement container for information pertaining to a single task '''
 
     def __init__(self, *args, **kwargs):
+        self.cfg = Config()
         self.__dict__.update(*args, **kwargs)
+        if 'config_section' in self.__dict__:
+            sect = self.__dict__['config_section']
+        else:
+            sect = 'default'
         self.name = inspect.stack()[1][3]
-        self.account = getattr(self, 'account', 'MDLST-T2O')
+        self.account = getattr(self, 'account', self.cfg.get_setting('account'))
         self.walltime = getattr(self, 'walltime', '00:20:00')
         self.maxtries = getattr(self, 'maxtries', '1')
-        self.queue = getattr(self, 'queue', 'dev2_shared')
-        if self.queue in ['dev2_shared', 'transfer']:
-            self.memory = getattr(self, 'memory', '2056M')
-            self.native = getattr(self, 'native', '-R affinity[core]')
-            self.cores = getattr(self, 'cores', '1')
+        self.queue = getattr(self, 'queue', self.cfg.get_setting('account'))
+        if 'queue_defaults' in self.cfg.config[sect]:
+            defaults = self.cfg.config[sect]['queue_defaults']
+            if self.queue in defaults:
+                for setting in defaults[self.queue]:
+                    self[setting] = defaults[self.queue][setting]
+
+       # if self.queue in ['dev2_shared', 'transfer']: # puth this stuff in config
+       #     self.memory = getattr(self, 'memory', '2056M')
+       #     self.native = getattr(self, 'native', '-R affinity[core]')
+       #     self.cores = getattr(self, 'cores', '1')
         try:
             self.jobname = getattr(self, 'jobname', self.__taskname__ + '_@Y@m@d@H')
         except:
