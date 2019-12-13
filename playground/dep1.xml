@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!DOCTYPE workflow []>
+<workflow realtime="T" scheduler="lsf">
+    <cycledef group="hourly">0 * * * * *</cycledef>
+    <cycledef group="six30">30 6 * * * *</cycledef>
+    <log>
+        <cyclestr>dep1.@Y@m@d@H</cyclestr>
+    </log>
+    <task name="task1" cycledefs="hourly six30" maxtries="1">
+        <jobname>task1</jobname>
+        <command>task1_command</command>
+        <queue>service</queue>
+        <cores>1</cores>
+        <join>task1.join</join>
+        <account>ACCOUNT</account>
+        <walltime>00:20:00</walltime>
+    </task>
+    <task name="task2" cycledefs="hourly six30" maxtries="1">
+        <jobname>task2</jobname>
+        <command>task2_command</command>
+        <queue>service</queue>
+        <cores>1</cores>
+        <join>task2.join</join>
+        <account>ACCOUNT</account>
+        <walltime>00:20:00</walltime>
+        <dependency>
+            <datadep>path/to/file</datadep>
+        </dependency>
+    </task>
+    <task name="task3" cycledefs="hourly six30" maxtries="1">
+        <jobname>task3</jobname>
+        <command>task3_command</command>
+        <queue>service</queue>
+        <cores>1</cores>
+        <join>task3.join</join>
+        <account>ACCOUNT</account>
+        <walltime>00:20:00</walltime>
+        <dependency>
+            <and>
+                <taskdep task="task1"/>
+                <taskdep task="task2"/>
+            </and>
+        </dependency>
+    </task>
+</workflow>
