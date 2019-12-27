@@ -2,6 +2,7 @@
 from xml.etree.ElementTree import tostring
 from xml.dom import minidom
 import re
+from abc import ABC, abstractmethod
 
 
 def _name_of_func(func):
@@ -100,3 +101,36 @@ def yes_or_no(question):
         if reply in ['n','no']:
             return False
 
+
+class Validator(ABC):
+    def __set_name__(self, owner, name):
+        self.private_name = f'_{name}'
+
+    def __get__(self, obj, objtype=None):
+        return getattr(obj, self.private_name)
+
+    def __set__(self, obj, value):
+        v = self.validate(value)
+        if v is not None: value = v
+        setattr(obj, self.private_name, value)
+        if not hasattr(obj, '_validated'):
+            obj._validated = []
+        if self.private_name not in obj._validated:
+            obj._validated.append(self.private_name)
+
+    @abstractmethod
+    def validate(self, value):
+        pass
+
+
+class String(Validator):
+    def __init__(self, contains=None):
+        self.isin = contains
+
+    def validate(self, value):
+        if not isinstance(value, str):
+            raise TypeError(f'Expected value {value!r} to be a string')
+
+        if self.isin is not None:
+            if self.isin not in value:
+                raise ValueError(f'Expected {self.isin} in value {repr(value)}')

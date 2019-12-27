@@ -9,7 +9,8 @@ hourly = flow.define_cycle('hourly','0 * * * * *')
 def task1():
     cycledefs = [hourly]
     jobname = 'task1'
-    command = 'task1_command'
+#    command = 'task1_command'
+    command = '/command'
     queue = 'service'
     cores = '1'
     join = 'task1.join'

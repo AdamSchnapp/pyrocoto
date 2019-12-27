@@ -7,7 +7,7 @@
     </log>
     <task name="task1" cycledefs="hourly" maxtries="1">
         <jobname>task1</jobname>
-        <command>task1_command</command>
+        <command>/command</command>
         <queue>service</queue>
         <cores>1</cores>
         <join>task1.join</join>
