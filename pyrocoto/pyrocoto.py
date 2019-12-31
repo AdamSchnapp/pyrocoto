@@ -119,53 +119,6 @@ def cyclestr(element, offset=None):
     return element
 
 
-#class Config():
-#    '''Implement configuration creation and access'''
-#    def __init__(self):
-#        '''Use configuaration file in current directory over home/config/'''
-#            
-#        config_here = os.path.join(Path.cwd(),'pyrocoto.yaml')
-#        config_home = os.path.join(Path.home(),'config','pyrocoto.yaml')
-#        
-#        config_prio = [config_here, config_home]
-#        for config_file in config_prio:
-#            if os.path.isfile(config_file):
-#                with open(config_file, 'r') as f:
-#                    self.config = yaml.full_load(f)
-#                    self.config_file = config_file
-#                return
-#                
-#        # no configfile was found; set up new configfile at home/config
-#        self.config = {}
-#        self.config_file = config_home
-#        dirname = os.path.dirname(config_home)
-#        if not os.path.exists(dirname):
-#            os.makedirs(dirname)
-#                
-#    def set_settings(self, settings, section='default'):
-#        for setting, value in settings.items():
-#            if value is None:
-#                value = input(f"Provide {section} setting for {setting}: ")
-#            if section not in self.config:
-#                self.config[section] = {}
-#            self.config[section][setting] = value
-#        with open(self.config_file,'w') as f:
-#            yaml.dump(self.config, f)
-#                    
-#    def get_setting(self, setting, section='default'):
-#        '''This method iteratively calls itself until it errors or returns with setting'''
-#        if section not in self.config:
-#            if yes_or_no(f"{section} does not already exist; create it?"):
-#                self.set_settings({setting:None}, section=section)
-#                self.get_setting(setting,section)
-#            else:
-#                raise ValueError(f"section {section} does not exist and is not being created") # exit point
-#        if setting in self.config[section]:
-#            return self.config[section][setting]  # exit point
-#        else:
-#            self.set_settings({setting:None}, section)
-#            self.get_setting(setting, section)
-        
 
 class Workflow(object):
     ''' Implement an abstarction layer on top of rocoto workflow management engine
@@ -299,150 +252,6 @@ class Workflow(object):
             E = task.generate_xml()
             xml.append(E)
 
-#        # Construct cycle definition XML elements
-#        self.cycle_groups = set()
-#        for cycledef in self.cycle_definitions:
-#            if cycledef.group in self.cycle_groups:
-#                raise ValueError('duplicate cycle group defined')
-#            self.cycle_groups.add(cycledef.group)
-#            cycledef_element = Element('cycledef', group=cycledef.group)
-#            if cycledef.activation_offset != 'None':
-#                cycledef_element.attrib['activation_offset'] = cycledef.activation_offset
-#            cycledef_element.text = cycledef.definition
-#            self.cycle_elements.append(cycledef_element)
-#
-#        # Evaluate task functions, verify tasks have a cycle definition
-#        # Store pertinent tasks in task_data
-
-
-#        for taskname, task in self.tasks.items():
-#
-#            if groups is not None and task['task_group'] not in groups:
-#                continue
-#
-#            task['task_unique_name'] = taskname
-#
-#            for cycledef in task['cycledefs']:
-#                try:
-#                    cycle_group = cycledef.group
-#                except:
-#                    cycle_group = cycledef
-#                if cycle_group not in self.cycle_groups:
-#                    raise ValueError('cycle group {} not defined'.format(cycle_group))
-#
-#            task['cycledefs'] = [groupattr(x) for x in task['cycledefs']]
-#
-#            if cycledefs is not None:
-#                cycledefs = [groupattr(x) for x in cycledefs]
-#                task['cycledefs'] = list(set(task['cycledefs']) & set(cycledefs))
-#            self.task_data.append(task)
-#
-#        # Perform checks on task_data and prep for writing XML
-#        for ix, task in enumerate(self.task_data):
-#            self.task_data[ix]['xml_elements'] = []
-#            for key in task.keys():
-#
-#                ''' Ignore data not directly relevant to rocoto xml workflow '''
-#                if key not in ['command', 'account', 'queue', 'cores', 'nodes',
-#                               'walltime', 'envar', 'native', 'memory', 'jobname',
-#                               'join', 'stdout', 'stderr', 'deadline', 'dependency']:
-#                    continue
-#
-#                ''' handle optional invironament variables (envar) '''
-#                if key == 'envar':
-#
-#                    for name, value in task[key].items():
-#                        envar = Element('envar')
-#                        name_element = Element('name')
-#                        name_element.text = name
-#                        envar.append(name_element)
-#                        value_element = Element('value')
-#                        if isinstance(value, tuple):
-#                            value_element.text = value[0]
-#                            offset = value[1]
-#                        else:
-#                            value_element.text = value
-#                            offset = None
-#                        value_element = cyclestr(value_element, offset)
-#                        envar.append(value_element)
-#                        self.task_data[ix]['xml_elements'].append(envar)
-#
-#                # handle optional dependencies/triggers for the task
-#                elif key == 'dependency':
-#                    try:
-#                        task['dependency'] = task['dependency'].elm
-#                    except:
-#                        pass
-#                    for dep in task['dependency'].iter():
-#                        if dep.tag == 'taskdep':
-#                            valid_task_dep_name = False
-#                            if task['task_group'] is not None:
-#                                if dep.attrib['task'].startswith('!'):
-#                                    dep.attrib['task'] = dep.attrib['task'][1:]
-#                                else:
-#                                    dep.attrib['task'] = task['task_group'] + '_' + dep.attrib['task']
-#                            for i, data in enumerate(self.task_data):
-#                                if (data['task_unique_name'] == dep.attrib['task']):
-#                                    if i > ix:
-#                                        print('task {} has dependencies which follow it'.format(data['name']))
-#                                        print('review the order of imported tasks')
-#                                        raise ValueError('dependent tasks not properly ordered')
-#                                    valid_task_dep_name = True
-#
-#                                    break
-#                            if not valid_task_dep_name:
-#                                print(dep.attrib['task'], ' is not a known task, continuing')
-#                                # raise ValueError
-#
-#                    deptag = Element('dependency')
-#                    deptag.append(task[key])
-#
-#                    self.task_data[ix]['dependency'] = deptag
-#
-#                #  handle remaining workflow tags provided by user
-#                else:
-#                    elm = Element(key)
-#                    elm.text = task[key]
-#                    self.task_data[ix]['xml_elements'].append(cyclestr(elm))
-#
-#            ''' handle craetion of task XML elements '''
-#            task_attributes = {}
-#            task_attributes['name'] = self.task_data[ix]['task_unique_name']
-#            task_attributes['cycledefs'] = ' '.join(self.task_data[ix]['cycledefs'])
-#            try:
-#                task_attributes['maxtries'] = self.task_data[ix]['maxtries']
-#            except:
-#                pass
-#            try:
-#                task_attributes['throttle'] = self.task_data[ix]['throttle']
-#            except:
-#                pass
-#            self.task_data[ix]['xml_task'] = Element('task', task_attributes)
-#
-#            self.task_data[ix]['xml_task'].extend(self.task_data[ix]['xml_elements'])
-#            try:
-#                self.task_data[ix]['xml_task'].append(self.task_data[ix]['dependency'])
-#            except:
-#                pass
-#
-#            # handle meta task
-#            if self.task_data[ix]['meta_dict'] is not None:
-#                metaelm = Element('metatask', name=self.task_data[ix]['metaname'])
-#                for var, metavars in self.task_data[ix]['meta_dict'].items():
-#                    elm = Element('var', name=var)
-#                    elm.text = metavars
-#                    metaelm.append(elm)
-#                self.task_data[ix]['vars'] = metaelm
-#                self.task_data[ix]['vars'].append(self.task_data[ix]['xml_task'])
-#                self.task_data[ix]['xml_task'] = self.task_data[ix]['vars']
-#            # print(self.task_data[ix]['xml_task'])
-#            self.task_elements.append(self.task_data[ix]['xml_task'])
-#            print('added task {}'.format(self.task_data[ix]['task_unique_name']))
-#
-#        self.workflow_element.extend(self.cycle_elements)
-#        self.workflow_element.append(self.log_element)
-#        self.workflow_element.extend(self.task_elements)
-#
         print(self.workflow_element)
         with open(xmlfile, 'w') as f:
             f.write('<?xml version="1.0"?>\n<!DOCTYPE workflow []>')
@@ -450,22 +259,20 @@ class Workflow(object):
 
 #class TaskBasic():
 #    ''' Implement container for information pertaining to a single task '''
-#    all_have = ['command', 'account', 'walltime', 'queue', 'maxtries']
-#    command = String(contains='/')
-    
-#    def __init__(self, **kwargs):
 
 class Task: 
     """ write something useful """
     # validate and track class meta data
     # note: validated data attributes are added to self._validated by the validators
-    command = String()
     jobname = String()
+    command = String()
+    join = String()
+    stderr = String()
     account = String()
+    memory = String() # maybe validate this more
     walltime = String(contains = ":")
     maxtries = String() # make int
     queue = String()
-    memory = String() # maybe validate this more
     native = String()
     cores = String() # make int
 #   dependency = Dependency()
@@ -480,7 +287,8 @@ class Task:
                  ['join', 'stderr'],
                  ['cores', 'nodes'],
                  ['cycledefs']]
-
+    # all metadata that is _for_xml should be validated and stored as 
+    # a string, Element or an object that has method as_element
     _for_xml = ['jobname',
                'command',
                'join',
@@ -488,6 +296,7 @@ class Task:
                'account'
                'memory',
                'walltime',
+               'maxtries',
                'cores',
                'nodes',
                'native',
@@ -495,16 +304,16 @@ class Task:
                'envar',
                'dependency']
 
+    # data that needs to be initialized first
+    _first = ['groups','meta']
 
     def __init__(self, d):
-        # If groups or meta provided, set them first as other metadata
-        # will validate or augment based on them
-        if 'groups' in d:
-            setattr(self,'groups', d['groups'])
-        if 'meta' in d:
-            setattr(self,'meta', d['meta'])
-        for k,v in d.items():
-            setattr(self, k, v)
+        
+        for var in self._first:
+            if var in d:
+                setattr(self, var, d[var])
+        for var, value in d.items():
+            setattr(self, var, value)
 
 
 
@@ -537,72 +346,7 @@ class Task:
                     print(f'working on {attr}')
                     elm_task.append(getattr(self,attr))
 
-        #print(Workflow.prettify(elm_task))
         return elm_task
-#        element_task = Element('task', task_attributes)
-#       return task(s) xml
-
-#class Task(object):
-#    ''' Implement container for information pertaining to a single task '''
-#    command = String(contains='/')
-#
-#    def __init__(self, *args, **kwargs):
-#        self.cfg = Config()
-#        self.inputs = {}
-#        self.inputs.update(**kwargs)
-#        setattr(self, 'command', self.inputs['command'])
-#        print(dir(self))
-#        print(getattr(self,'command'))
-#        if 'config_section' in self.__dict__:
-#            sect = self.__dict__['config_section']
-#        else:
-#            sect = 'default'
-#        self.name = inspect.stack()[1][3]
-#        self.account = getattr(self, 'account', self.cfg.get_setting('account'))
-#        self.walltime = getattr(self, 'walltime', '00:20:00')
-#        self.maxtries = getattr(self, 'maxtries', '1')
-#        self.queue = getattr(self, 'queue', self.cfg.get_setting('account'))
-#        if 'queue_defaults' in self.cfg.config[sect]:
-#            defaults = self.cfg.config[sect]['queue_defaults']
-#            if self.queue in defaults:
-#                for setting in defaults[self.queue]:
-#                    self[setting] = defaults[self.queue][setting]
-#
-#       # if self.queue in ['dev2_shared', 'transfer']: # puth this stuff in config
-#       #     self.memory = getattr(self, 'memory', '2056M')
-#       #     self.native = getattr(self, 'native', '-R affinity[core]')
-#       #     self.cores = getattr(self, 'cores', '1')
-#        try:
-#            self.jobname = getattr(self, 'jobname', self.__taskname__ + '_@Y@m@d@H')
-#        except:
-#            self.jobname = getattr(self, 'jobname', self.name + '_@Y@m@d@H')
-#
-#    def __repr__(self):
-#        return '%s' % vars(self)
-#
-#    def __getitem__(self, key):
-#        return getattr(self, key)
-#
-#    def __setitem__(self, key, val):
-#        return setattr(self, key, val)
-#
-#    def apply_group(self, group):
-#        for key, obj in vars(self).items():
-#            # def f(x):
-#            #     return x.replace(':group:', group)
-#            f = lambda x: x.replace(':group:', group)
-#            obj = modify_tree_nodes(obj, action_func=f)
-#            self[key] = obj
-#
-#    def verify(self):
-#        required_keys = [['command'], ['join', 'stderr'],
-#                         ['cores', 'nodes'], ['cycledefs']]
-#        keys = self.__dict__.keys()
-#        for reqkey in required_keys:
-#            if set(reqkey) & set(keys):
-#                continue
-#            print('missing requred inputs ' + str(reqkey))
-#            raise ValueError(f'expected information for {repr(reqkey)}')
 
 
 class Dependency():
