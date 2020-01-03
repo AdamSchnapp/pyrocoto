@@ -17,33 +17,35 @@ class String(Validator):
         self.isin = contains
 
     def validate(self, value):
+        name = super().get_name()
         if not isinstance(value, str):
-            raise TypeError(f'Expected value {value!r} to be a string')
+            raise TypeError(f'Expected "{name}" value {value!r} to be a string')
 
         if self.isin is not None:
             if self.isin not in value:
-                raise ValueError(f'Expected {self.isin} in value {repr(value)}')
+                raise ValueError(f'Expected {self.isin} in "{name}" value {repr(value)}')
 
-class Groups(Validator):
-    def __init__(self):
-        pass
-
-    def validate(self, value):
-        msg = f'Expected groups value {value!r} to be string or list of strings' 
-        if not isinstance(value, list) and not isinstance(value, str):
-            raise TypeError(msg)
-        if isinstance(value, list):
-            for item in value:
-                if not isinstance(item, str):
-                    raise TypeError(msg)
+#class Groups(Validator):
+#    def __init__(self):
+#        pass
+#
+#    def validate(self, value):
+#        msg = f'Expected groups value {value!r} to be string or list of strings' 
+#        if not isinstance(value, list) and not isinstance(value, str):
+#            raise TypeError(msg)
+#        if isinstance(value, list):
+#            for item in value:
+#                if not isinstance(item, str):
+#                    raise TypeError(msg)
 
 class Envar(Validator):
     def __init__(self, contains=None):
         self.isin = contains
 
     def validate(self, value):
+        ''' stores xml from dict input '''
         if not isinstance(value, dict):
-            raise TypeError(f'Expected Envar value {value!r} to be a dictionary')
+            raise TypeError(f'Expected envar value {value!r} to be a dictionary')
         envars = []
         for name, v in value.items():
             envar = Element('envar')
@@ -56,13 +58,43 @@ class Envar(Validator):
                 offset = value[1]
             else:                  
                 value_element.text = v
-                print(tostring(value_element))
                 offset = None
                 value_element = cyclestr(value_element, offset)
                 envar.append(value_element)
             envars.append(envar)
             
         return envars
+
+class Meta(Validator):
+    def __init__(self, contains=None):
+        self.isin = contains
+
+    def validate(self, value):
+        if not isinstance(value, dict):
+            raise TypeError(f'Expected meta value {value!r} to be a dictionary')
+        for v in value.values():
+            if not isinstance(v, str):
+                raise TypeError(f'Expected to find string values in meta dict, \
+                                  but found {repr(v)}')
+
+class Cycledefs(Validator):
+    def __init__(self, contains=None):
+        self.isin = contains
+
+    def validate(self, value):
+        ''' return list of cycledefs if not already '''
+        if isinstance(value,  CycleDefinition):
+            return([value])
+        if isinstance(value, list):
+            for i in value:
+                if not isinstance(i, CycleDefinition):
+                    msg = f'Expected CycleDefinition, but got {type(i)}'
+                    raise TypeError(msg)
+        if not isinstance(value, list):
+            raise TypeError(f'Expected Cycledefs value {value!r} to' \
+                    'be CycleDefinition or list of CycleDefinitions\n') 
+
+
 
 class CycleDefinition():
     # add logic to verify user provides a valid definition
@@ -128,10 +160,7 @@ class Workflow(object):
 
     def __init__(self, realtime='T', scheduler='lsf', **kwargs):
         self.tasks = []
-        self.task_data = []
         self.cycle_definitions = set()
-        self.cycle_elements = []
-        self.task_elements = []
 
         self.workflow_element = Element('workflow', realtime=realtime,
                                         scheduler=scheduler, **kwargs)
@@ -147,66 +176,7 @@ class Workflow(object):
         log.text = logfile
         self.log_element = cyclestr(log)
 
-    def register_task(self, groups=None, task_name=None, task=None,
-                      meta=None, metaname=None):
-        ''' register tasks in the workflows task registry'''
-
-        if task is not None:
-            task.verify()
-            task.meta_dict = meta
-            task.metaname = metaname
-
-            if groups is not None:
-                for group in groups:
-                    task_work = copy.deepcopy(task)
-                    task_work.apply_group(group)
-                    task_work.task_group = group
-                    task_unique_name = group + '_' + task_name
-                    self.tasks[task_unique_name] = copy.deepcopy(vars(task_work))
-            else:
-                self.tasks[task_name] = vars(task)
-                task.task_group = None
-
-#    def task(self, groups=None, meta=None, **options):
-#        ''' a decorator used to register task functions
-#
-#        @flow.task
-#        def taskname(task_group):
-#            namespace for defining task
-#            return Task(var())
-#        '''
-#
-#        def decorator(func):
-#            task = func()
-#            metaname = None
-#            if hasattr(task, '__taskname__'):
-#                task_name = task.__taskname__
-#                if meta is not None:
-#                    metaname = task.__taskname__.replace('#','')
-#                    for key in meta.keys():
-#                        if key not in task_name:
-#                            raise ValueError('var "{}" was not fount in __taskname__ as #{}#'.format(key,key))
-#            else:
-#                # let function name be task name
-#                task_name = _name_of_func(func)
-#                if meta is not None:
-#                    print('__taskname__ must be used with a metatask')
-#                    raise ValueError
-#
-#            self.register_task(groups, task_name, task, meta, metaname)
-#            return func
-#
-#        return decorator
-#        ''' a decorator used to associate tasks with workflow
-#
-#        @flow.task
-#        def taskname(task_group):
-#            namespace for defining task
-#            return Task(var())
-#        '''
-    def add_task(self, task, groups=None, meta=None):
-        task._groups = groups
-        task._meta = meta
+    def add_task(self, task):
         task.validate() # will raise error if eggregate of task info appears to have issues
         for cycledef in task.cycledefs:
             self.cycle_definitions.add(cycledef)
@@ -224,7 +194,7 @@ class Workflow(object):
         def decorator(func):
             task = func()
             self.add_task(task)
-            print(task)
+            logger.info(f'adding task {task.name}')
         return decorator
 
 
@@ -264,26 +234,26 @@ class Task:
     """ write something useful """
     # validate and track class meta data
     # note: validated data attributes are added to self._validated by the validators
+    name = String() # tasks added to workflow should have unique name
     jobname = String()
-    command = String()
-    join = String()
-    stderr = String()
+    command = String(contains = '/')
+    join = String(contains = '/')
+    stderr = String(contains = '/')
     account = String()
     memory = String() # maybe validate this more
-    walltime = String(contains = ":")
-    maxtries = String() # make int
+    walltime = String(contains = ':')
+    maxtries = String()
     queue = String()
     native = String()
-    cores = String() # make int
-#   dependency = Dependency()
-    groups = Groups()
+    cores = String()
     envar = Envar()
+    meta = Meta()
+    cycledefs = Cycledefs()
+#   dependency = Dependency()
 
-    name = String() # tasks added to workflow should have unique name
-#    _groups = String() # make this a list, ensure all items unique
-#    _meta = String() # make this a dict, ensure all values are strings
 
-    _required = [['command'],
+    _required = [['name'],
+                 ['command'],
                  ['join', 'stderr'],
                  ['cores', 'nodes'],
                  ['cycledefs']]
@@ -296,7 +266,6 @@ class Task:
                'account'
                'memory',
                'walltime',
-               'maxtries',
                'cores',
                'nodes',
                'native',
@@ -304,18 +273,13 @@ class Task:
                'envar',
                'dependency']
 
-    # data that needs to be initialized first
-    _first = ['groups','meta']
 
     def __init__(self, d):
-        
-        for var in self._first:
-            if var in d:
-                setattr(self, var, d[var])
+        # set some defaults
+        self.maxtries = '1'
+        # set user passed data that will overwrite any default
         for var, value in d.items():
             setattr(self, var, value)
-
-
 
     def validate(self):
         # ensure that metadata that should be diffrent by job is.
@@ -325,25 +289,31 @@ class Task:
         # ensure the agregate of data for this task looks ok
         # check here for common mistakes as found only if they are based on a combination of data pieces
         # single data validation should occur within a validator
-        pass
+        for req_attrs in self._required:
+            good = False
+            for attr in req_attrs:
+                if hasattr(self,attr):
+                    good = True
+                    break
+            if not good:
+                raise ValueError(f'Expected one of {repr(req_attrs)} to be set')
 
     def generate_xml(self):
-        elm_task = Element('task')
+        task_attrs = {'name': self.name,
+                'cycledefs': [x.group for x in self.cycledefs],
+                'maxtries': self.maxtries}
+#        task_attrs['name']
+        elm_task = Element('task', task_attrs)
         for attr in self._for_xml:
-            print(f'trying {attr}')
             if hasattr(self,attr):
-                print(f'found {attr}')
                 if getattr(self,attr) is not Element:
-                    print(f'working on {attr}')
                     if attr.strip('_') == 'envar': 
                         elm_task.extend(getattr(self,attr))
-                        print(tostring(getattr(self,attr)[0]))
                     else:
                         E = Element(attr.strip('_'))
                         E.text = getattr(self,attr)
                         elm_task.append(E)
                 else:
-                    print(f'working on {attr}')
                     elm_task.append(getattr(self,attr))
 
         return elm_task
@@ -398,5 +368,3 @@ class Dependency():
                 add_elm = dep
             elm.append(add_elm)
         return elm
-
-    pass

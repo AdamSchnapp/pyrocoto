@@ -5,9 +5,6 @@ import re
 from abc import ABC, abstractmethod
 
 
-def _name_of_func(func):
-    assert func is not None
-    return func.__name__
 
 #def traverse(obj, path=None, callback=None):
 #    if path is None:
@@ -74,13 +71,6 @@ def prettify(elem):
     return reparsed.toprettyxml(indent="    ",encoding=None)
 
 
-def groupattr(x):
-    try:
-        return x.group
-    except:
-        return x
-
-
 def validate_cycle_def(cycdef):
     start_stop_step = re.compile(r'\d{12} \d{12} \d{2}:\d{2}:\d{2}')
     crude_cron_syntax = re.compile(r'(.+\s+){5}.')
@@ -93,13 +83,13 @@ def validate_cycle_def(cycdef):
         return False
 
 
-def yes_or_no(question):
-    while "not y or n response":
-        reply = str(input(question+' (y/n): ')).lower().strip()
-        if reply in ['y','yes']:
-            return True
-        if reply in ['n','no']:
-            return False
+#def yes_or_no(question):
+#    while "not y or n response":
+#        reply = str(input(question+' (y/n): ')).lower().strip()
+#        if reply in ['y','yes']:
+#            return True
+#        if reply in ['n','no']:
+#            return False
 
 
 class Validator(ABC):
@@ -108,6 +98,11 @@ class Validator(ABC):
 
     def __get__(self, obj, objtype=None):
         return getattr(obj, self.private_name)
+
+    def get_name(self):
+        ''' can be used by subclass with super().get_name() to discover 
+            the private name without _ ; helpfull for raising informative errors'''
+        return self.private_name.strip('_')
 
     def __set__(self, obj, value):
         v = self.validate(value)
@@ -120,6 +115,8 @@ class Validator(ABC):
 
     @abstractmethod
     def validate(self, value):
+        ''' validate method can accept (null return), augment (return augmented)
+        or raise an error'''
         pass
 
 
