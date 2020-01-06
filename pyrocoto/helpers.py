@@ -5,26 +5,6 @@ import re
 from abc import ABC, abstractmethod
 
 
-
-#def traverse(obj, path=None, callback=None):
-#    if path is None:
-#        path = []
-#
-#    if isinstance(obj, dict):
-#        value = {k: traverse(v, path + [k], callback)
-#                 for k, v in obj.items()}
-#    elif isinstance(obj, list):
-#        value = [traverse(elem, path + [[]], callback)
-#                 for elem in obj]
-#    else:
-#        value = obj
-#
-#    if callback is None:  # if a callback is provided, call it to get the new value
-#        return value
-#    else:
-#        return callback(path, value)
-
-
 def traverse_modify(obj, path=None, action_func=None):
     if path is None:
         path = []
@@ -48,12 +28,6 @@ def modify_tree_nodes(obj, action_func):
     if isinstance(obj, dict):
         try:
             for k, v in obj.items():
-                obj[k] = action_func(obj[k])
-        except:
-            modify_tree_nodes(obj, action_func)
-    elif isinstance(obj, dict):
-        try:
-            for ix, v in obj.items():
                 obj[k] = action_func(obj[k])
         except:
             modify_tree_nodes(obj, action_func)
@@ -118,16 +92,3 @@ class Validator(ABC):
         ''' validate method can accept (null return), augment (return augmented)
         or raise an error'''
         pass
-
-
-class String(Validator):
-    def __init__(self, contains=None):
-        self.isin = contains
-
-    def validate(self, value):
-        if not isinstance(value, str):
-            raise TypeError(f'Expected value {value!r} to be a string')
-
-        if self.isin is not None:
-            if self.isin not in value:
-                raise ValueError(f'Expected {self.isin} in value {repr(value)}')

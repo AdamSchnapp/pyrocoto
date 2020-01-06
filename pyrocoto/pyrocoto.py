@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from xml.etree.ElementTree import Element, tostring
 from xml.dom import minidom
-from .helpers import _name_of_func, groupattr, modify_tree_nodes, yes_or_no, Validator
+from .helpers import  Validator
 from collections import OrderedDict
 import inspect
 import copy
@@ -12,11 +12,13 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-class String(Validator):
+class String(Validator):                                                                            
     def __init__(self, contains=None):
         self.isin = contains
 
     def validate(self, value):
+        if isinstance(value, Offset):
+            return # offset objects are strings with additional offset
         name = super().get_name()
         if not isinstance(value, str):
             raise TypeError(f'Expected "{name}" value {value!r} to be a string')
@@ -25,18 +27,21 @@ class String(Validator):
             if self.isin not in value:
                 raise ValueError(f'Expected {self.isin} in "{name}" value {repr(value)}')
 
-#class Groups(Validator):
-#    def __init__(self):
-#        pass
-#
-#    def validate(self, value):
-#        msg = f'Expected groups value {value!r} to be string or list of strings' 
-#        if not isinstance(value, list) and not isinstance(value, str):
-#            raise TypeError(msg)
-#        if isinstance(value, list):
-#            for item in value:
-#                if not isinstance(item, str):
-#                    raise TypeError(msg)
+
+class Offset:
+    ''' entry that should recieve time offset '''
+    offset = String()
+    value = String(contains='@')
+
+    def __init__(self, value, offset):
+        self.offset = offset
+        self.value = value
+
+    def to_element(self):
+        E = Element('cyclestr', offset=self.offset)
+        E.text = self.value
+        return E
+         
 
 class Envar(Validator):
     def __init__(self, contains=None):
@@ -53,14 +58,12 @@ class Envar(Validator):
             name_element.text = name
             envar.append(name_element)
             value_element = Element('value')
-            if isinstance(v, tuple):
-                value_element.text = v[0]
-                offset = value[1]
+            if hasattr(v, 'to_element'):
+                value_element.append(v.to_element())
             else:                  
                 value_element.text = v
-                offset = None
-                value_element = cyclestr(value_element, offset)
-                envar.append(value_element)
+                value_element = cyclestr(value_element)
+            envar.append(value_element)
             envars.append(envar)
             
         return envars
@@ -128,26 +131,19 @@ class CycleDefinition():
 
 
 
-def cyclestr(element, offset=None):
-    ''' Wrap text elements containing '@' for syclestr information with cyclestr tag '''
+def cyclestr(element):
+    ''' Wrap text elements containing '@' for syclestr information with cyclestr tag.
+        Elements that do not contain '@' are returned unchanged'''
     if not isinstance(element, Element):
-        raise ValueError('element passed must be of type Element')
+        raise TypeError('element passed must be of type Element')
     if element.text is None:
         raise ValueError('passed element does not have text')
     if '@' in element.text:
         text = element.text
         element.text = None
-        if offset is not None:
-            if not isinstance(offset, str):
-                raise ValueError('offset passed must be of type str but was '+str(type(offset)))
-            cyclestr_element = Element('cyclestr', offset=offset)
-        else:
-            cyclestr_element = Element('cyclestr')
+        cyclestr_element = Element('cyclestr')
         cyclestr_element.text = text
         element.append(cyclestr_element)
-    else:
-        if offset is not None:
-            raise ValueError("offset was passed but no '@' in element.text")
     return element
 
 
@@ -187,7 +183,7 @@ class Workflow(object):
             Use to wrap functions that will return task object
 
         @flow.task()
-        def taskname(task_group):
+        def task():
             namespace for defining task
             return Task(locals())
         '''
@@ -204,11 +200,8 @@ class Workflow(object):
         reparsed = minidom.parseString(rough_string)
         return reparsed.toprettyxml(indent="    ", encoding=None)
 
-    def write_xml(self, xmlfile, groups=None, cycledefs=None):
+    def write_xml(self, xmlfile, cycledefs=None):
         ''' write xml workflow.
-            Groups of tasks or tasks based on specific cycle definitions can
-            be spacifically written.
-            By default all registerd tasks and cycle definitions are written.
         '''
 
         xml = self.workflow_element
@@ -227,11 +220,9 @@ class Workflow(object):
             f.write('<?xml version="1.0"?>\n<!DOCTYPE workflow []>')
             f.write(self.prettify(self.workflow_element)[22:])
 
-#class TaskBasic():
-#    ''' Implement container for information pertaining to a single task '''
 
 class Task: 
-    """ write something useful """
+    ''' Implement container for information pertaining to a single task '''
     # validate and track class meta data
     # note: validated data attributes are added to self._validated by the validators
     name = String() # tasks added to workflow should have unique name
@@ -251,13 +242,14 @@ class Task:
     cycledefs = Cycledefs()
 #   dependency = Dependency()
 
-
+    # Specify required metadata, multiple entries indicates atleast one of is required
+    # I.E atleast one of 'join' or 'stderr' is required
     _required = [['name'],
                  ['command'],
                  ['join', 'stderr'],
                  ['cores', 'nodes'],
                  ['cycledefs']]
-    # all metadata that is _for_xml should be validated and stored as 
+    # All metadata that is _for_xml should be validated and stored as 
     # a string, Element or an object that has method as_element
     _for_xml = ['jobname',
                'command',
@@ -285,7 +277,6 @@ class Task:
         # ensure that metadata that should be diffrent by job is.
         # jobname, join/stderr,
         # meta keys should be specified when meta and
-        # :group: should be specified when groups
         # ensure the agregate of data for this task looks ok
         # check here for common mistakes as found only if they are based on a combination of data pieces
         # single data validation should occur within a validator
@@ -300,19 +291,27 @@ class Task:
 
     def generate_xml(self):
         task_attrs = {'name': self.name,
-                'cycledefs': [x.group for x in self.cycledefs],
+                'cycledefs': ','.join([x.group for x in self.cycledefs]),
                 'maxtries': self.maxtries}
 #        task_attrs['name']
         elm_task = Element('task', task_attrs)
         for attr in self._for_xml:
-            if hasattr(self,attr):
-                if getattr(self,attr) is not Element:
-                    if attr.strip('_') == 'envar': 
-                        elm_task.extend(getattr(self,attr))
-                    else:
+            if hasattr(self, attr):
+                V = getattr(self, attr)
+                if V is not Element:
+                    if attr.strip('_') == 'envar': # envar is a list of elements 
+                        elm_task.extend(V)
+                    elif hasattr(V, 'to_element'):
                         E = Element(attr.strip('_'))
-                        E.text = getattr(self,attr)
+                        E.append(V.to_element())
                         elm_task.append(E)
+                    elif isinstance(attr, str):
+                        E = Element(attr.strip('_'))
+                        E.text = V
+                        E = cyclestr(E)
+                        elm_task.append(E)
+                    else:
+                        raise TypeError('{attr} can not be converted to an XML element')
                 else:
                     elm_task.append(getattr(self,attr))
 
@@ -336,15 +335,15 @@ class Dependency():
             self.elm = Element(deptype, **kwargs)
             self.elm.text = data
             if offset is not None:
-                self.elm = cyclestr(self.elm, offset=offset, **kwargs)
+                self.elm = cyclestr(self.elm)
             else:
-                self.elm = cyclestr(self.elm, **kwargs)
+                self.elm = cyclestr(self.elm)
         elif deptype == 'timedep':
             if offset is None:
                 raise
             elm = Element(deptype)
             elm.text = '@Y@m@d@H@M@S'
-            self.elm = cyclestr(elm, offset=offset, **kwargs)
+            self.elm = cyclestr(elm)
         elif deptype == 'sh':
             if sh is None:
                 raise
