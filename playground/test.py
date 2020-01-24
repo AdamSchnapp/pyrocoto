@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from pyrocoto import Workflow, Task, Dependency, Offset
+from pyrocoto import Workflow, Task, Dependency, Offset, product_meta
 from pathlib import Path
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -14,8 +14,7 @@ min15 = flow.define_cycle('min15','0,15,45 * * * * *', activation_offset='-00:00
 @flow.task()
 def prep():
     name = 'prep'
-    groups = ['expr','expr2']
-    cycledefs=[hourly, min15]
+    cycledefs = hourly
     command = '/runcommand_:group:'
     jobname = 'jobname_@Y@m@d@H'
     queue = 'queue'
@@ -31,8 +30,7 @@ def prep():
 @flow.task()
 def obs_granalysis():
     name = '#element#_#level#_obs'  #required for specifying metatask vars in tasks name
-    meta = {'element' : 'cig vis', 'level' : 'ifr lifr'}
-    groups = ['expr','expr2']
+    meta = product_meta({'element' : 'cig vis', 'level' : 'ifr lifr'})
     cycledefs = [hourly, min15]                     # Required
     command = Offset('/runcommand_:group: @Y@m@d@H','2:00:00')       # Required
     jobname = ':group:_jobname_#element#_#level#_@Y@m@d@H'          # Will default to something reasonable
@@ -41,7 +39,7 @@ def obs_granalysis():
              'level' : '#level#'}                       # top level Job script should do the bulk of environment variable setting
     nodes = '1:ppn=24'                            # Requires either cores or nodes tag
     native = '-a openmp'
-    join = '/'+jobname+'.join'                        # every task should have a join or stderr and stdout for logs
+    join = f'/{jobname}.join'                        # every task should have a join or stderr and stdout for logs
 
     and1 = Dependency('datadep',data='filename')
     and2 = Dependency('taskdep',task=':group:_taskname', cycle_offset='-6:00:00')

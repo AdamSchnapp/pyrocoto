@@ -2,9 +2,10 @@
 from xml.etree.ElementTree import Element, tostring
 from xml.dom import minidom
 from .helpers import  Validator
-from collections import OrderedDict
-import inspect
-import copy
+#from collections import OrderedDict
+from itertools import product
+#import inspect
+#import copy
 import logging
 import os
 from pathlib import Path
@@ -37,9 +38,11 @@ class Offset:
         self.offset = offset
         self.value = value
 
-    def to_element(self):
-        E = Element('cyclestr', offset=self.offset)
-        E.text = self.value
+    def to_element(self, name):
+        E = Element(name)
+        Esub = Element('cyclestr', offset=self.offset)
+        Esub.text = self.value
+        E.append(Esub)
         return E
          
 
@@ -57,16 +60,18 @@ class Envar(Validator):
             name_element = Element('name')
             name_element.text = name
             envar.append(name_element)
-            value_element = Element('value')
-            if hasattr(v, 'to_element'):
-                value_element.append(v.to_element())
-            else:                  
+            if isinstance(v, str):
+                value_element = Element('value')
                 value_element.text = v
                 value_element = cyclestr(value_element)
+            else:
+                value_element = to_element(v, 'value')
             envar.append(value_element)
             envars.append(envar)
             
         return envars
+
+
 
 class Meta(Validator):
     def __init__(self, contains=None):
@@ -242,6 +247,9 @@ class Task:
     cycledefs = Cycledefs()
 #   dependency = Dependency()
 
+    defaults = {'maxtries':'2',
+                'walltime':'20:00'}
+
     # Specify required metadata, multiple entries indicates atleast one of is required
     # I.E atleast one of 'join' or 'stderr' is required
     _required = [['name'],
@@ -267,9 +275,11 @@ class Task:
 
 
     def __init__(self, d):
-        # set some defaults
-        self.maxtries = '1'
-        # set user passed data that will overwrite any default
+        # set some defaults if not already set
+        for k, v in self.defaults.items()
+        if not hasattr(self, k):
+            setattr(self, k, v)
+        # set user passed data that will overwrite any defaults
         for var, value in d.items():
             setattr(self, var, value)
 
@@ -290,33 +300,48 @@ class Task:
                 raise ValueError(f'Expected one of {repr(req_attrs)} to be set')
 
     def generate_xml(self):
+        ''' Convert task's metadata into a Task rocoto XML element '''
         task_attrs = {'name': self.name,
                 'cycledefs': ','.join([x.group for x in self.cycledefs]),
                 'maxtries': self.maxtries}
 #        task_attrs['name']
         elm_task = Element('task', task_attrs)
         for attr in self._for_xml:
+            ''' metadata will be string, list, or accomodated by to_element function '''
             if hasattr(self, attr):
+                print(attr)
                 V = getattr(self, attr)
-                if V is not Element:
-                    if attr.strip('_') == 'envar': # envar is a list of elements 
-                        elm_task.extend(V)
-                    elif hasattr(V, 'to_element'):
-                        E = Element(attr.strip('_'))
-                        E.append(V.to_element())
-                        elm_task.append(E)
-                    elif isinstance(attr, str):
-                        E = Element(attr.strip('_'))
-                        E.text = V
-                        E = cyclestr(E)
-                        elm_task.append(E)
-                    else:
-                        raise TypeError('{attr} can not be converted to an XML element')
-                else:
-                    elm_task.append(getattr(self,attr))
+                Ename = attr.strip('_')
+                if isinstance(V, str):
+                    E = Element(Ename)
+                    E.text = V
+                    E = cyclestr(E)
+                    elm_task.append(E)
+                elif isinstance(V, list):
+                    elm_task.extend(V)
+                else: 
+                    elm_task.append(to_element(V,Ename))
+        if hasattr(self, 'meta'):
+            E_metatask  = Element('metatask')
+            for k, v in self.meta.items():
+                print(k,v)
+                E = Element('var', name=k)
+                E.text = v
+                E_metatask.append(E)
+            E_metatask.append(elm_task)
+            elm_task = E_metatask
 
         return elm_task
 
+def to_element(obj, name):
+    if hasattr(obj, 'to_element'):
+        print(f"{name} has attr to_element")
+        return obj.to_element(name)
+    elif isinstance(obj, list):
+        # lists are assumed to be lists of elements
+        E = Element()
+        E.extend(obj)
+        return E
 
 class Dependency():
     def __init__(self, deptype, data=None, offset=None, task=None, metatask=None, sh=None, **kwargs):
@@ -361,9 +386,25 @@ class Dependency():
     def operator(oper, *args):
         elm = Element(oper)
         for dep in args:
-            try:
-                add_elm = dep.elm
-            except:
+            if isinstance(dep,Element):
                 add_elm = dep
+            else:
+                add_elm = dep.elm
             elm.append(add_elm)
         return elm
+
+def product_meta(dict):
+    new_dict = {}
+    keys = [k for k in dict.keys()]
+    l = [v.split(' ') for v in dict.values()]
+
+    iter = product(*l)
+    l = [list(i) for i in iter]
+    l = [list(x) for x in zip(*l)] # reshape
+    l = [" ".join(x) for x in l]
+
+    for k,v in zip(keys,l):
+        new_dict[k]=v
+
+    return new_dict
+
