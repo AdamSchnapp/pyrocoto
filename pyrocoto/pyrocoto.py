@@ -393,6 +393,38 @@ class Dependency():
             elm.append(add_elm)
         return elm
 
+class XmlElement(Validator):                                                                            
+    def __init__(self):
+        pass
+
+    def validate(self, value):
+        if not isinstance(value, Element):
+            raise(TypeError(f'Expected Element but got {type(value)}'))
+
+
+class Dependency():
+    
+    elm=XmlElement()
+    
+    def __init__(self, elm):
+        self.elm = elm
+        
+    
+    def operator(self, oper, *args):
+        ''' Return new dependency wrapped in an operator tag; the operator is not validated'''
+        if hasattr(self, elm) and len(args) < 1:
+            raise TypeError('Expected args')
+        if not hasattr(self, elm) and len(args) < 2:
+            raise TypeError('Expected atleast two args')
+        for arg in args:
+            if not isinstance(arg, Dependency):
+                raise TypeError(f'Expected Dependency but got {type(arg)}')
+        elm = Element(oper)
+        for arg in args:
+            elm.append(arg)
+        return Dependency(elm)
+
+
 def product_meta(dict):
     new_dict = {}
     keys = [k for k in dict.keys()]
