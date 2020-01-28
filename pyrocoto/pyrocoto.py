@@ -38,8 +38,8 @@ class Offset:
         self.offset = offset
         self.value = value
 
-    def to_element(self, name):
-        E = Element(name)
+    def to_element(self, name, **kwargs):
+        E = Element(name, kwargs)
         Esub = Element('cyclestr', offset=self.offset)
         Esub.text = self.value
         E.append(Esub)
@@ -161,6 +161,8 @@ class Workflow(object):
 
     def __init__(self, realtime='T', scheduler='lsf', **kwargs):
         self.tasks = []
+        self.task_names = set() # set of unique task names, metatasks are expended.
+        self.metatask_names = set()
         self.cycle_definitions = set()
 
         self.workflow_element = Element('workflow', realtime=realtime,
@@ -177,11 +179,30 @@ class Workflow(object):
         log.text = logfile
         self.log_element = cyclestr(log)
 
+    def validate_task_in_workflow(self, task):
+        if hasattr(task, 'dependency'):
+            for elm in task.dependency.to_element().iter():
+                if elm.tag == 'taskdep':
+                    if elm.attrib['task'] not in self.task_names:
+                        n = elm.attrib['task']
+                        raise ValueError(f'Task {n} is a dependency, but is not in workflow')
+                if elm.tag == 'metataskdep':
+                    if elm.attrib['metatask'] not in self.metatask_names:
+                        n = elm.attrib['metatask']
+                        raise ValueError(f'Metatask {n} is a dependency, but is not in workflowa')
+
     def add_task(self, task):
         task.validate() # will raise error if eggregate of task info appears to have issues
+        self.validate_task_in_workflow(task) # will raise errors if task dependency issues
         for cycledef in task.cycledefs:
             self.cycle_definitions.add(cycledef)
         self.tasks.append(task)
+        if not self.task_names.isdisjoint(task.task_names): # if intersection
+            raise ValueError(f'Task names must be unique; Error adding task {task.name}')
+        else:
+            self.task_names.update(task.task_names)
+        if hasattr(task, 'metatask_name'):
+            self.metatask_names.add(task.metatask_name)
 
     def task(self):
         ''' decorator used to associate tasks with workflow
@@ -276,10 +297,11 @@ class Task:
 
     def __init__(self, d):
         # set some defaults if not already set
-        for k, v in self.defaults.items()
-        if not hasattr(self, k):
-            setattr(self, k, v)
+        for k, v in self.defaults.items():
+            if not hasattr(self, k):
+                setattr(self, k, v)
         # set user passed data that will overwrite any defaults
+        self.task_names = set()
         for var, value in d.items():
             setattr(self, var, value)
 
@@ -298,6 +320,33 @@ class Task:
                     break
             if not good:
                 raise ValueError(f'Expected one of {repr(req_attrs)} to be set')
+        # store task name(s) in self.task_names
+        if not hasattr(self, 'meta'):
+            self.task_names.add(self.name)
+        else:
+            # check that all vars are same length and convert to dict of lists
+            for v in self.meta.values():
+                ntasks = len(v.split())
+                break
+            meta_with_lists = {}
+            for k, v in self.meta.items():
+                as_list = v.split()
+                if len(as_list) != ntasks:
+                    raise ValueError('meta vars not all equal length')
+                meta_with_lists[k] = as_list
+            meta_task_names = []
+            for ix in range(ntasks):
+                n = self.name
+                for key in meta_with_lists.keys():
+                    n = n.replace(f'#{key}#', meta_with_lists[key][ix])
+                if n not in self.task_names:
+                    self.task_names.add(n)
+                else:
+                    raise ValueError('meta variables must produce unique tasks')
+                
+            
+             
+
 
     def generate_xml(self):
         ''' Convert task's metadata into a Task rocoto XML element '''
@@ -322,7 +371,10 @@ class Task:
                 else: 
                     elm_task.append(to_element(V,Ename))
         if hasattr(self, 'meta'):
-            E_metatask  = Element('metatask')
+            if hasattr(self, 'metatask_name'):
+                E_metatask  = Element('metatask', metatask_name=self.metatask_name)
+            else:
+                E_metatask  = Element('metatask')
             for k, v in self.meta.items():
                 print(k,v)
                 E = Element('var', name=k)
@@ -409,20 +461,83 @@ class Dependency():
     def __init__(self, elm):
         self.elm = elm
         
-    
-    def operator(self, oper, *args):
+    @staticmethod
+    def operator(oper, *args):
         ''' Return new dependency wrapped in an operator tag; the operator is not validated'''
-        if hasattr(self, elm) and len(args) < 1:
-            raise TypeError('Expected args')
-        if not hasattr(self, elm) and len(args) < 2:
-            raise TypeError('Expected atleast two args')
+        print(oper)
+        print(args)
+        if len(args) < 2:
+            raise TypeError(f'Expected atleast two args, but got {len(args)},{args}')
         for arg in args:
             if not isinstance(arg, Dependency):
-                raise TypeError(f'Expected Dependency but got {type(arg)}')
+                raise TypeError(f'Expected Dependency but got {type(arg)},{arg}')
         elm = Element(oper)
         for arg in args:
-            elm.append(arg)
+            elm.append(arg.elm)
         return Dependency(elm)
+    
+    def to_element(self, name='dependency'):
+        E = Element(name)
+        E.append(self.elm)
+        return E
+
+class DataDep(Dependency):
+    def __init__(self, data, age=None, minsize=None):
+        if not isinstance(data, str) and not isinstance(data, Offset):
+            raise TypeError(f'Expected data to be type str or Offset, but was {type(data)}')
+        E_attrs = {}
+        if isinstance(age, str):
+            E_attrs['age'] = age
+        if isinstance(minsize, str):
+            E_attrs['minsize'] = minsize
+        if isinstance(data, Offset):
+            E = data.to_element('datadep', **E_attrs)
+        else:
+            E = Element('datadep', E_attrs)
+            E.text = data
+            E = cyclestr(E)
+        self.elm = E
+
+class TaskDep(Dependency):
+    def __init__(self, task, cycle_offset=None, state=None):
+        if not isinstance(task, str):
+            raise TypeError(f'Expected data to be type str but was {type(data)}')
+        E_attrs = {}
+        E_attrs['task'] = task
+        if isinstance(cycle_offset, str):
+            E_attrs['cycle_offset'] = cycle_offset
+        if isinstance(state, str):
+            E_attrs['state'] = state
+        E = Element('taskdep', E_attrs)
+        self.elm = E
+
+class MetaTaskDep(Dependency):
+    def __init__(self, metatask, cycle_offset=None, state=None, threshold=None):
+        if not isinstance(metatask, str):
+            raise TypeError(f'Expected data to be type str but was {type(data)}')
+        E_attrs = {}
+        E_attrs['metatask'] = metatask
+        if isinstance(cycle_offset, str):
+            E_attrs['cycle_offset'] = cycle_offset
+        if isinstance(state, str):
+            E_attrs['state'] = state
+        if isinstance(threshold, str):
+            E_attrs['threshold'] = threshold
+        E = Element('metataskdep', E_attrs)
+        self.elm = E
+
+class TimeDep(Dependency):
+    def __init__(self, time):
+        if not isinstance(data, str) and not isinstance(data, Offset):
+            raise TypeError(f'Expected data to be type str or Offset, but was {type(data)}')
+        if isinstance(data, Offset):
+            E = data.to_element('timedep')
+        else:
+            E = Element('timedep')
+            E.text = data
+            E = cyclestr(E)
+        self.elm = E
+
 
 
 def product_meta(dict):

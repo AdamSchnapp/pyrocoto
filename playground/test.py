@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from pyrocoto import Workflow, Task, Dependency, Offset, product_meta
+from pyrocoto import Workflow, Task, Dependency, Offset, DataDep, product_meta
 from pathlib import Path
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -15,7 +15,7 @@ min15 = flow.define_cycle('min15','0,15,45 * * * * *', activation_offset='-00:00
 def prep():
     name = 'prep'
     cycledefs = hourly
-    command = '/runcommand_:group:'
+    command = '/runcommand'
     jobname = 'jobname_@Y@m@d@H'
     queue = 'queue'
     envar = {'var1' : 'value1',
@@ -32,8 +32,8 @@ def obs_granalysis():
     name = '#element#_#level#_obs'  #required for specifying metatask vars in tasks name
     meta = product_meta({'element' : 'cig vis', 'level' : 'ifr lifr'})
     cycledefs = [hourly, min15]                     # Required
-    command = Offset('/runcommand_:group: @Y@m@d@H','2:00:00')       # Required
-    jobname = ':group:_jobname_#element#_#level#_@Y@m@d@H'          # Will default to something reasonable
+    command = Offset('/runcommand @Y@m@d@H','2:00:00')       # Required
+    jobname = 'jobname_#element#_#level#_@Y@m@d@H'          # Will default to something reasonable
     queue = 'queue'                                
     envar = {'element' : '#element#',                   # Optional, set environment variables
              'level' : '#level#'}                       # top level Job script should do the bulk of environment variable setting
@@ -41,12 +41,17 @@ def obs_granalysis():
     native = '-a openmp'
     join = f'/{jobname}.join'                        # every task should have a join or stderr and stdout for logs
 
-    and1 = Dependency('datadep',data='filename')
-    and2 = Dependency('taskdep',task=':group:_taskname', cycle_offset='-6:00:00')
-    and3 = Dependency('timedep', offset='00:00:34')
+    #and1 = Dependency('datadep',data='filename')
+    #and2 = Dependency('taskdep',task=':group:_taskname', cycle_offset='-6:00:00')
+    #and3 = Dependency('timedep', offset='00:00:34')
 #    dependency = and1
 #    dependency = Dependency.operator('and' ,and1, and2, and3)
 #    dependency = Dependency('taskdep',task='plotvis')
+    d1 = DataDep('/root/file1')
+    d2 = DataDep(Offset('/root/file2_@H','-00:01:00'))
+    d1_and_d2 = Dependency.operator('and' ,d1 ,d2)
+    d3 = DataDep('/root/file3_@H')
+    dependency = Dependency.operator('or' ,d1_and_d2 ,d3)
                                                 
     return Task(locals())                           # don't modify this
 
