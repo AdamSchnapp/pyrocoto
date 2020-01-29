@@ -1,25 +1,20 @@
 #!/usr/bin/env python
 from xml.etree.ElementTree import Element, tostring
 from xml.dom import minidom
-from .helpers import  Validator
-#from collections import OrderedDict
+from .helpers import Validator
 from itertools import product
-#import inspect
-#import copy
 import logging
-import os
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 
-class String(Validator):                                                                            
+class String(Validator):
     def __init__(self, contains=None):
         self.isin = contains
 
     def validate(self, value):
         if isinstance(value, Offset):
-            return # offset objects are strings with additional offset
+            return  # offset objects are strings with additional offset
         name = super().get_name()
         if not isinstance(value, str):
             raise TypeError(f'Expected "{name}" value {value!r} to be a string')
@@ -44,7 +39,7 @@ class Offset:
         Esub.text = self.value
         E.append(Esub)
         return E
-         
+
 
 class Envar(Validator):
     def __init__(self, contains=None):
@@ -63,14 +58,12 @@ class Envar(Validator):
             if isinstance(v, str):
                 value_element = Element('value')
                 value_element.text = v
-                value_element = cyclestr(value_element)
+                value_element = _cyclestr(value_element)
             else:
                 value_element = to_element(v, 'value')
             envar.append(value_element)
             envars.append(envar)
-            
         return envars
-
 
 
 class Meta(Validator):
@@ -84,6 +77,53 @@ class Meta(Validator):
             if not isinstance(v, str):
                 raise TypeError(f'Expected to find string values in meta dict, \
                                   but found {repr(v)}')
+
+
+class XmlElement(Validator):
+    def __init__(self):
+        pass
+
+    def validate(self, value):
+        if not isinstance(value, Element):
+            raise(TypeError(f'Expected Element but got {type(value)}'))
+
+
+class Dependency():
+
+    elm = XmlElement()
+
+    def __init__(self, elm):
+        self.elm = elm
+
+    @staticmethod
+    def operator(oper, *args):
+        ''' Return new dependency wrapped in an operator tag; the operator is not validated'''
+        if len(args) < 2:
+            raise TypeError(f'Expected atleast two args, but got {len(args)},{args}')
+        for arg in args:
+            if not isinstance(arg, Dependency):
+                raise TypeError(f'Expected Dependency but got {type(arg)},{arg}')
+        elm = Element(oper)
+        for arg in args:
+            elm.append(arg.elm)
+        return Dependency(elm)
+
+    def to_element(self, name='dependency'):
+        E = Element(name)
+        E.append(self.elm)
+        return E
+
+
+class IsDependency(Validator):
+
+    def __init__(self):
+        pass
+
+    def validate(self, value):
+        if not isinstance(value, Dependency):
+            name = super().get_name()
+            raise TypeError(f'Expected "{name}" value {value!r} to be a Dependency')
+
 
 class Cycledefs(Validator):
     def __init__(self, contains=None):
@@ -99,9 +139,8 @@ class Cycledefs(Validator):
                     msg = f'Expected CycleDefinition, but got {type(i)}'
                     raise TypeError(msg)
         if not isinstance(value, list):
-            raise TypeError(f'Expected Cycledefs value {value!r} to' \
-                    'be CycleDefinition or list of CycleDefinitions\n') 
-
+            raise TypeError(f'Expected Cycledefs value {value!r} to'
+                            'be CycleDefinition or list of CycleDefinitions\n')
 
 
 class CycleDefinition():
@@ -112,7 +151,7 @@ class CycleDefinition():
         self.activation_offset = str(activation_offset)
 
     def __repr__(self):
-        return "CycleDefinition({!r})".format(self.__dict__) 
+        return "CycleDefinition({!r})".format(self.__dict__)
 
     def __eq__(self, other):
         if isinstance(other, CycleDefinition):
@@ -126,8 +165,8 @@ class CycleDefinition():
 
     def __hash__(self):
         return hash(self.group + self.definition + self.activation_offset)
-    
-    def generate_xml(self):
+
+    def _generate_xml(self):
         cycledef_element = Element('cycledef', group=self.group)
         cycledef_element.text = self.definition
         if self.activation_offset != 'None':
@@ -135,8 +174,7 @@ class CycleDefinition():
         return cycledef_element
 
 
-
-def cyclestr(element):
+def _cyclestr(element):
     ''' Wrap text elements containing '@' for syclestr information with cyclestr tag.
         Elements that do not contain '@' are returned unchanged'''
     if not isinstance(element, Element):
@@ -152,7 +190,6 @@ def cyclestr(element):
     return element
 
 
-
 class Workflow(object):
     ''' Implement an abstarction layer on top of rocoto workflow management engine
         The WorkFlow class will serve as a central object that registers all units of work
@@ -161,7 +198,7 @@ class Workflow(object):
 
     def __init__(self, realtime='T', scheduler='lsf', **kwargs):
         self.tasks = []
-        self.task_names = set() # set of unique task names, metatasks are expended.
+        self.task_names = set()  # set of unique task names, metatasks are expended.
         self.metatask_names = set()
         self.cycle_definitions = set()
 
@@ -177,28 +214,28 @@ class Workflow(object):
     def set_log(self, logfile):
         log = Element('log')
         log.text = logfile
-        self.log_element = cyclestr(log)
+        self.log_element = _cyclestr(log)
 
-    def validate_task_in_workflow(self, task):
+    def _validate_task_dependencies(self, task):
         if hasattr(task, 'dependency'):
             for elm in task.dependency.to_element().iter():
                 if elm.tag == 'taskdep':
                     if elm.attrib['task'] not in self.task_names:
                         n = elm.attrib['task']
-                        raise ValueError(f'Task {n} is a dependency, but is not in workflow')
+                        raise ValueError(f'Task depenency {repr(n)} is not in workflow')
                 if elm.tag == 'metataskdep':
                     if elm.attrib['metatask'] not in self.metatask_names:
                         n = elm.attrib['metatask']
-                        raise ValueError(f'Metatask {n} is a dependency, but is not in workflowa')
+                        raise ValueError(f'Metatask dependency {repr(n)} is not in workflowa')
 
     def add_task(self, task):
-        task.validate() # will raise error if eggregate of task info appears to have issues
-        self.validate_task_in_workflow(task) # will raise errors if task dependency issues
+        task._validate()  # will raise error if eggregate of task info appears to have issues
+        self._validate_task_dependencies(task)  # will raise errors if task dependency issues
         for cycledef in task.cycledefs:
             self.cycle_definitions.add(cycledef)
         self.tasks.append(task)
-        if not self.task_names.isdisjoint(task.task_names): # if intersection
-            raise ValueError(f'Task names must be unique; Error adding task {task.name}')
+        if not self.task_names.isdisjoint(task.task_names):  # if intersection
+            raise ValueError(f'Task names must be unique; Error adding task {repr(task.name)}')
         else:
             self.task_names.update(task.task_names)
         if hasattr(task, 'metatask_name'):
@@ -216,9 +253,8 @@ class Workflow(object):
         def decorator(func):
             task = func()
             self.add_task(task)
-            logger.info(f'adding task {task.name}')
+            logger.info(f'adding task {repr(task.name)}')
         return decorator
-
 
     @staticmethod
     def prettify(elem):
@@ -234,31 +270,30 @@ class Workflow(object):
         xml.append(self.log_element)
 
         for cycledef in self.cycle_definitions:
-            E = cycledef.generate_xml()
+            E = cycledef._generate_xml()
             xml.append(E)
 
         for task in self.tasks:
-            E = task.generate_xml()
+            E = task._generate_xml()
             xml.append(E)
 
-        print(self.workflow_element)
         with open(xmlfile, 'w') as f:
             f.write('<?xml version="1.0"?>\n<!DOCTYPE workflow []>')
             f.write(self.prettify(self.workflow_element)[22:])
 
 
-class Task: 
+class Task:
     ''' Implement container for information pertaining to a single task '''
     # validate and track class meta data
     # note: validated data attributes are added to self._validated by the validators
-    name = String() # tasks added to workflow should have unique name
+    name = String()  # tasks added to workflow should have unique name
     jobname = String()
-    command = String(contains = '/')
-    join = String(contains = '/')
-    stderr = String(contains = '/')
+    command = String(contains='/')
+    join = String(contains='/')
+    stderr = String(contains='/')
     account = String()
-    memory = String() # maybe validate this more
-    walltime = String(contains = ':')
+    memory = String()  # maybe validate this more
+    walltime = String(contains=':')
     maxtries = String()
     queue = String()
     native = String()
@@ -266,10 +301,10 @@ class Task:
     envar = Envar()
     meta = Meta()
     cycledefs = Cycledefs()
-#   dependency = Dependency()
+    dependency = IsDependency()
 
-    defaults = {'maxtries':'2',
-                'walltime':'20:00'}
+    defaults = {'maxtries': '2',
+                'walltime': '20:00'}
 
     # Specify required metadata, multiple entries indicates atleast one of is required
     # I.E atleast one of 'join' or 'stderr' is required
@@ -278,22 +313,21 @@ class Task:
                  ['join', 'stderr'],
                  ['cores', 'nodes'],
                  ['cycledefs']]
-    # All metadata that is _for_xml should be validated and stored as 
+    # All metadata that is _for_xml should be validated and stored as
     # a string, Element or an object that has method as_element
     _for_xml = ['jobname',
-               'command',
-               'join',
-               'stderr',
-               'account'
-               'memory',
-               'walltime',
-               'cores',
-               'nodes',
-               'native',
-               'memory',
-               'envar',
-               'dependency']
-
+                'command',
+                'join',
+                'stderr',
+                'account'
+                'memory',
+                'walltime',
+                'cores',
+                'nodes',
+                'native',
+                'memory',
+                'envar',
+                'dependency']
 
     def __init__(self, d):
         # set some defaults if not already set
@@ -305,17 +339,17 @@ class Task:
         for var, value in d.items():
             setattr(self, var, value)
 
-    def validate(self):
+    def _validate(self):
         # ensure that metadata that should be diffrent by job is.
         # jobname, join/stderr,
         # meta keys should be specified when meta and
         # ensure the agregate of data for this task looks ok
-        # check here for common mistakes as found only if they are based on a combination of data pieces
+        # check for common mistakes that are based on a combination of data
         # single data validation should occur within a validator
         for req_attrs in self._required:
             good = False
             for attr in req_attrs:
-                if hasattr(self,attr):
+                if hasattr(self, attr):
                     good = True
                     break
             if not good:
@@ -334,7 +368,6 @@ class Task:
                 if len(as_list) != ntasks:
                     raise ValueError('meta vars not all equal length')
                 meta_with_lists[k] = as_list
-            meta_task_names = []
             for ix in range(ntasks):
                 n = self.name
                 for key in meta_with_lists.keys():
@@ -343,40 +376,34 @@ class Task:
                     self.task_names.add(n)
                 else:
                     raise ValueError('meta variables must produce unique tasks')
-                
-            
-             
 
-
-    def generate_xml(self):
+    def _generate_xml(self):
         ''' Convert task's metadata into a Task rocoto XML element '''
         task_attrs = {'name': self.name,
-                'cycledefs': ','.join([x.group for x in self.cycledefs]),
-                'maxtries': self.maxtries}
+                      'cycledefs': ','.join([x.group for x in self.cycledefs]),
+                      'maxtries': self.maxtries}
 #        task_attrs['name']
         elm_task = Element('task', task_attrs)
         for attr in self._for_xml:
             ''' metadata will be string, list, or accomodated by to_element function '''
             if hasattr(self, attr):
-                print(attr)
                 V = getattr(self, attr)
                 Ename = attr.strip('_')
                 if isinstance(V, str):
                     E = Element(Ename)
                     E.text = V
-                    E = cyclestr(E)
+                    E = _cyclestr(E)
                     elm_task.append(E)
                 elif isinstance(V, list):
                     elm_task.extend(V)
-                else: 
-                    elm_task.append(to_element(V,Ename))
+                else:
+                    elm_task.append(to_element(V, Ename))
         if hasattr(self, 'meta'):
             if hasattr(self, 'metatask_name'):
-                E_metatask  = Element('metatask', metatask_name=self.metatask_name)
+                E_metatask = Element('metatask', metatask_name=self.metatask_name)
             else:
-                E_metatask  = Element('metatask')
+                E_metatask = Element('metatask')
             for k, v in self.meta.items():
-                print(k,v)
                 E = Element('var', name=k)
                 E.text = v
                 E_metatask.append(E)
@@ -385,9 +412,9 @@ class Task:
 
         return elm_task
 
+
 def to_element(obj, name):
     if hasattr(obj, 'to_element'):
-        print(f"{name} has attr to_element")
         return obj.to_element(name)
     elif isinstance(obj, list):
         # lists are assumed to be lists of elements
@@ -395,91 +422,6 @@ def to_element(obj, name):
         E.extend(obj)
         return E
 
-class Dependency():
-    def __init__(self, deptype, data=None, offset=None, task=None, metatask=None, sh=None, **kwargs):
-        deptypes = set(['taskdep', 'datadep', 'timedep', 'metataskdep', 'sh'])
-        if deptype not in deptypes:
-            raise ValueError(f"deptype is {deptype}, but expected one of {deptypes}")
-        if deptype == 'taskdep':
-            if task is None:
-                raise ValueError()
-            self.elm = Element(deptype, task=task, **kwargs)
-            # task dependency allows for cycle_offset and state attribute.
-            # these can be passed as kwargs
-        elif deptype == 'datadep':
-            if data is None:
-                raise
-            self.elm = Element(deptype, **kwargs)
-            self.elm.text = data
-            if offset is not None:
-                self.elm = cyclestr(self.elm)
-            else:
-                self.elm = cyclestr(self.elm)
-        elif deptype == 'timedep':
-            if offset is None:
-                raise
-            elm = Element(deptype)
-            elm.text = '@Y@m@d@H@M@S'
-            self.elm = cyclestr(elm)
-        elif deptype == 'sh':
-            if sh is None:
-                raise
-            elm = Element(deptype)
-            elm.text = sh
-            self.elm = elm
-        elif deptype == 'metataskdep':
-            if metatask is None:
-                raise ValueError()
-            self.elm = Element(deptype, metatask=metatask, **kwargs)
-            # metatask dependency allows for cycle_offset, state, and threshold attribute.
-            # these can be passed as kwargs
-
-    @staticmethod
-    def operator(oper, *args):
-        elm = Element(oper)
-        for dep in args:
-            if isinstance(dep,Element):
-                add_elm = dep
-            else:
-                add_elm = dep.elm
-            elm.append(add_elm)
-        return elm
-
-class XmlElement(Validator):                                                                            
-    def __init__(self):
-        pass
-
-    def validate(self, value):
-        if not isinstance(value, Element):
-            raise(TypeError(f'Expected Element but got {type(value)}'))
-
-
-class Dependency():
-    
-    elm=XmlElement()
-    
-    def __init__(self, elm):
-        self.elm = elm
-        
-    @staticmethod
-    def operator(oper, *args):
-        ''' Return new dependency wrapped in an operator tag; the operator is not validated'''
-        print(oper)
-        print(args)
-        if len(args) < 2:
-            raise TypeError(f'Expected atleast two args, but got {len(args)},{args}')
-        for arg in args:
-            if not isinstance(arg, Dependency):
-                raise TypeError(f'Expected Dependency but got {type(arg)},{arg}')
-        elm = Element(oper)
-        for arg in args:
-            elm.append(arg.elm)
-        return Dependency(elm)
-    
-    def to_element(self, name='dependency'):
-        E = Element(name)
-        E.append(self.elm)
-        return E
 
 class DataDep(Dependency):
     def __init__(self, data, age=None, minsize=None):
@@ -495,13 +437,14 @@ class DataDep(Dependency):
         else:
             E = Element('datadep', E_attrs)
             E.text = data
-            E = cyclestr(E)
+            E = _cyclestr(E)
         self.elm = E
+
 
 class TaskDep(Dependency):
     def __init__(self, task, cycle_offset=None, state=None):
         if not isinstance(task, str):
-            raise TypeError(f'Expected data to be type str but was {type(data)}')
+            raise TypeError(f'Expected data to be type str, but was {type(task)}')
         E_attrs = {}
         E_attrs['task'] = task
         if isinstance(cycle_offset, str):
@@ -511,10 +454,11 @@ class TaskDep(Dependency):
         E = Element('taskdep', E_attrs)
         self.elm = E
 
+
 class MetaTaskDep(Dependency):
     def __init__(self, metatask, cycle_offset=None, state=None, threshold=None):
         if not isinstance(metatask, str):
-            raise TypeError(f'Expected data to be type str but was {type(data)}')
+            raise TypeError(f'Expected metatask to be type str, but was {type(metatask)}')
         E_attrs = {}
         E_attrs['metatask'] = metatask
         if isinstance(cycle_offset, str):
@@ -526,32 +470,32 @@ class MetaTaskDep(Dependency):
         E = Element('metataskdep', E_attrs)
         self.elm = E
 
+
 class TimeDep(Dependency):
     def __init__(self, time):
-        if not isinstance(data, str) and not isinstance(data, Offset):
-            raise TypeError(f'Expected data to be type str or Offset, but was {type(data)}')
-        if isinstance(data, Offset):
-            E = data.to_element('timedep')
+        if not isinstance(time, str) and not isinstance(time, Offset):
+            raise TypeError(f'Expected time to be type str or Offset, but was {type(time)}')
+        if isinstance(time, Offset):
+            E = time.to_element('timedep')
         else:
             E = Element('timedep')
-            E.text = data
-            E = cyclestr(E)
+            E.text = time
+            E = _cyclestr(E)
         self.elm = E
 
 
-
-def product_meta(dict):
+def product_meta(dict_in):
+    if not isinstance(dict_in, dict):
+        raise TypeError(f'Expected dict, but got {type(dict_in)}')
     new_dict = {}
-    keys = [k for k in dict.keys()]
-    l = [v.split(' ') for v in dict.values()]
+    keys = [k for k in dict_in.keys()]
+    values_as_list_of_lists = [v.split(' ') for v in dict_in.values()]
+    prodicized = product(*values_as_list_of_lists)
+    combinations_list_of_lists = [list(i) for i in prodicized]
+    new_values_as_list_of_lists = [list(x) for x in zip(*combinations_list_of_lists)]  # reshape
+    new_values_as_list = [" ".join(x) for x in new_values_as_list_of_lists]
 
-    iter = product(*l)
-    l = [list(i) for i in iter]
-    l = [list(x) for x in zip(*l)] # reshape
-    l = [" ".join(x) for x in l]
-
-    for k,v in zip(keys,l):
-        new_dict[k]=v
+    for k, v in zip(keys, new_values_as_list):
+        new_dict[k] = v
 
     return new_dict
-

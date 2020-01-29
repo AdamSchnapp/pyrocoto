@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from pyrocoto import Workflow, Task, Dependency, Offset, DataDep, product_meta
+from pyrocoto import Workflow, Task, Dependency, Offset, DataDep, TaskDep, MetaTaskDep, product_meta
 from pathlib import Path
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +29,7 @@ def prep():
 
 @flow.task()
 def obs_granalysis():
+    metatask_name = 'obs_gran'
     name = '#element#_#level#_obs'  #required for specifying metatask vars in tasks name
     meta = product_meta({'element' : 'cig vis', 'level' : 'ifr lifr'})
     cycledefs = [hourly, min15]                     # Required
@@ -50,11 +51,27 @@ def obs_granalysis():
     d1 = DataDep('/root/file1')
     d2 = DataDep(Offset('/root/file2_@H','-00:01:00'))
     d1_and_d2 = Dependency.operator('and' ,d1 ,d2)
-    d3 = DataDep('/root/file3_@H')
-    dependency = Dependency.operator('or' ,d1_and_d2 ,d3)
+    d3 = TaskDep('prep')
+    dependency = Dependency.operator('and' ,d1_and_d2 ,d3)
                                                 
     return Task(locals())                           # don't modify this
 
+
+@flow.task()
+def prep():
+    name = 'after_obs_granalsysis'
+    cycledefs = hourly
+    command = '/runcommand'
+    jobname = 'jobname_@Y@m@d@H'
+    queue = 'queue'
+    envar = {'var1' : 'value1',
+             'var2' : 'value2',
+             'var3' : Offset('@Y@m@d@H','2:00:00'),
+             'var4' : '@Y@m@d@H'}
+    cores = '1'
+    join = '/temp/job@Y@m@d@H.join'
+    dependency = MetaTaskDep('obs_gran')
+    return Task(locals())
 
 
 if __name__ == '__main__':
