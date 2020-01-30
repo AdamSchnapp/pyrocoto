@@ -14,7 +14,6 @@ setup(
     author="Adam Schnapp",
     author_email="adschnapp@gmail.com",
     url=url,
-    install_requires=['pyyaml'],
     download_url="{}/tarball/{}".format(url, version),
     license="MIT"
 )
