@@ -491,6 +491,27 @@ class TimeDep(Dependency):
         self.elm = E
 
 
+class TimeDep(Dependency):
+    def __init__(self, time):
+        if not isinstance(time, str) and not isinstance(time, Offset):
+            raise TypeError(f'Expected time to be type str or Offset, but was {type(time)}')
+        if isinstance(time, Offset):
+            E = time.to_element('timedep')
+        else:
+            E = Element('timedep')
+            E.text = time
+            E = _cyclestr(E)
+        self.elm = E
+
+class TagDep(Dependency):
+    ''' provide mechanism for user to specify the tag 'sh' or 'rb'
+        and the text for the tag; User must provide cyclstr tags in text if they need them '''
+    def __init__(self, tag, text):
+        E = Element(tag)
+        E.text = text
+        self.elm = E
+        
+
 def product_meta(dict_in):
     if not isinstance(dict_in, dict):
         raise TypeError(f'Expected dict, but got {type(dict_in)}')

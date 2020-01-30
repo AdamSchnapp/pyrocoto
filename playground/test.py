@@ -77,13 +77,13 @@ def prep():
     return Task(locals())
 
 class MySerialTask(Task):
-    def __init__(self, d):
+    def __init__(self, *args):
         self.account = 'myproject'
         self.cores = '1'
         self.memory = '2G'
         self.walltime = '00:10:00'
         self.queue = 'serialqueue'
-        super().__init__(d)
+        super().__init__(*args)
 
 
 @flow.task()
