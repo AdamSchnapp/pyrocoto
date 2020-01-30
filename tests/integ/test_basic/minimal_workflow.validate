@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!DOCTYPE workflow []>
+<workflow realtime="T" scheduler="lsf">
+    <log>
+        <cyclestr>log_task1.@Y@m@d@H</cyclestr>
+    </log>
+    <cycledef group="hourly">0 * * * * *</cycledef>
+    <task name="task1" cycledefs="hourly" maxtries="2">
+        <jobname>
+            <cyclestr>task1_@Y@m@d@H</cyclestr>
+        </jobname>
+        <command>
+            <cyclestr>/runcommand @Y@m@d@H</cyclestr>
+        </command>
+        <join>
+            <cyclestr>/task1_@Y@m@d@H.join</cyclestr>
+        </join>
+        <account>my_account</account>
+        <queue>queue</queue>
+        <walltime>20:00</walltime>
+        <cores>1</cores>
+    </task>
+</workflow>

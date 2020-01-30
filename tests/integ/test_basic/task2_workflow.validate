@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<!DOCTYPE workflow []>
+<workflow realtime="T" scheduler="lsf">
+    <log>
+        <cyclestr>log_task1.@Y@m@d@H</cyclestr>
+    </log>
+    <cycledef group="hourly">0 * * * * *</cycledef>
+    <cycledef group="min15">15,30,45 * * * * *</cycledef>
+    <task name="task2" cycledefs="hourly,min15" maxtries="3">
+        <jobname>
+            <cyclestr>task2_@Y@m@d@H@M</cyclestr>
+        </jobname>
+        <command>
+            <cyclestr>/runcommand @Y@m@d@H@M</cyclestr>
+        </command>
+        <join>
+            <cyclestr>/task2_@Y@m@d@H@M.join</cyclestr>
+        </join>
+        <account>my_account</account>
+        <queue>queue</queue>
+        <walltime>1:00:00</walltime>
+        <nodes>10:ppn=4</nodes>
+        <native>-setting_to_pass_to_scheduler_that_rocoto_may_not_support</native>
+        <envar>
+            <name>SETTING1</name>
+            <value>YES</value>
+        </envar>
+        <envar>
+            <name>SETTING2</name>
+            <value>NO</value>
+        </envar>
+        <envar>
+            <name>YESTERDAY</name>
+            <value>
+                <cyclestr offset="-24:00:00">@Y@m@d</cyclestr>
+            </value>
+        </envar>
+    </task>
+</workflow>

@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<!DOCTYPE workflow []>
+<workflow realtime="T" scheduler="lsf">
+    <log>
+        <cyclestr>log_task.@Y@m@d@H</cyclestr>
+    </log>
+    <cycledef group="hourly">0 * * * * *</cycledef>
+    <task name="taskthing1" cycledefs="hourly" maxtries="2">
+        <jobname>
+            <cyclestr>task1_@Y@m@d@H_thing1</cyclestr>
+        </jobname>
+        <command>
+            <cyclestr>/runcommand @Y@m@d@H thing1</cyclestr>
+        </command>
+        <join>
+            <cyclestr>/task1_@Y@m@d@H_thing1.join</cyclestr>
+        </join>
+        <account>myproject</account>
+        <queue>queue_for_my_serial_task</queue>
+        <memory>2G</memory>
+        <walltime>00:10:00</walltime>
+        <cores>1</cores>
+        <memory>2G</memory>
+        <dependency>
+            <datadep>file_needed_for_thing1</datadep>
+        </dependency>
+    </task>
+    <task name="taskthing2" cycledefs="hourly" maxtries="2">
+        <jobname>
+            <cyclestr>task1_@Y@m@d@H_thing2</cyclestr>
+        </jobname>
+        <command>
+            <cyclestr>/runcommand @Y@m@d@H thing2</cyclestr>
+        </command>
+        <join>
+            <cyclestr>/task1_@Y@m@d@H_thing2.join</cyclestr>
+        </join>
+        <account>myproject</account>
+        <queue>queue_for_my_serial_task</queue>
+        <memory>2G</memory>
+        <walltime>00:10:00</walltime>
+        <cores>1</cores>
+        <memory>2G</memory>
+        <dependency>
+            <datadep>file_needed_for_thing2</datadep>
+        </dependency>
+    </task>
+    <task name="taskthing3" cycledefs="hourly" maxtries="2">
+        <jobname>
+            <cyclestr>task1_@Y@m@d@H_thing3</cyclestr>
+        </jobname>
+        <command>
+            <cyclestr>/runcommand @Y@m@d@H thing3</cyclestr>
+        </command>
+        <join>
+            <cyclestr>/task1_@Y@m@d@H_thing3.join</cyclestr>
+        </join>
+        <account>myproject</account>
+        <queue>queue_for_my_serial_task</queue>
+        <memory>2G</memory>
+        <walltime>00:10:00</walltime>
+        <cores>1</cores>
+        <memory>2G</memory>
+        <dependency>
+            <datadep>file_needed_for_thing3</datadep>
+        </dependency>
+    </task>
+</workflow>

@@ -164,7 +164,7 @@ class CycleDefinition():
             return False
 
     def __hash__(self):
-        return hash(self.group + self.definition + self.activation_offset)
+        return hash(self.group)
 
     def _generate_xml(self):
         cycledef_element = Element('cycledef', group=self.group)
@@ -200,7 +200,7 @@ class Workflow(object):
         self.tasks = []
         self.task_names = set()  # set of unique task names, metatasks are expended.
         self.metatask_names = set()
-        self.cycle_definitions = set()
+        self.cycle_definitions = []  # this is a list so that iteration is deterministic
 
         self.workflow_element = Element('workflow', realtime=realtime,
                                         scheduler=scheduler, **kwargs)
@@ -208,7 +208,10 @@ class Workflow(object):
 
     def define_cycle(self, group, definition, activation_offset=None):
         cycledef = CycleDefinition(group, definition, activation_offset)
-        self.cycle_definitions.add(cycledef)
+        print(f'adding cycle {group}')
+        if cycledef in self.cycle_definitions:
+            raise ValueError('cannot add cycle with same group name')
+        self.cycle_definitions.append(cycledef)
         return cycledef
 
     def set_log(self, logfile):
@@ -232,7 +235,8 @@ class Workflow(object):
         task._validate()  # will raise error if eggregate of task info appears to have issues
         self._validate_task_dependencies(task)  # will raise errors if task dependency issues
         for cycledef in task.cycledefs:
-            self.cycle_definitions.add(cycledef)
+            if cycledef not in self.cycle_definitions:
+                self.cycle_definitions.append(cycledef)
         self.tasks.append(task)
         if not self.task_names.isdisjoint(task.task_names):  # if intersection
             raise ValueError(f'Task names must be unique; Error adding task {repr(task.name)}')
@@ -312,14 +316,17 @@ class Task:
                  ['command'],
                  ['join', 'stderr'],
                  ['cores', 'nodes'],
-                 ['cycledefs']]
+                 ['cycledefs'],
+                 ['queue'],
+                 ['account']]
     # All metadata that is _for_xml should be validated and stored as
     # a string, Element or an object that has method as_element
     _for_xml = ['jobname',
                 'command',
                 'join',
                 'stderr',
-                'account'
+                'account',
+                'queue',
                 'memory',
                 'walltime',
                 'cores',

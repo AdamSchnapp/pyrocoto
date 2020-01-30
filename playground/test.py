@@ -24,6 +24,7 @@ def prep():
              'var4' : '@Y@m@d@H'}
     cores = '1'
     join = '/temp/job@Y@m@d@H.join'
+    account = 'my_account'
     return Task(locals())
 
 
@@ -36,6 +37,7 @@ def obs_granalysis():
     command = Offset('/runcommand @Y@m@d@H','2:00:00')       # Required
     jobname = 'jobname_#element#_#level#_@Y@m@d@H'          # Will default to something reasonable
     queue = 'queue'                                
+    account = 'my_account'
     envar = {'element' : '#element#',                   # Optional, set environment variables
              'level' : '#level#'}                       # top level Job script should do the bulk of environment variable setting
     nodes = '1:ppn=24'                            # Requires either cores or nodes tag
@@ -64,6 +66,7 @@ def prep():
     command = '/runcommand'
     jobname = 'jobname_@Y@m@d@H'
     queue = 'queue'
+    account = 'my_account'
     envar = {'var1' : 'value1',
              'var2' : 'value2',
              'var3' : Offset('@Y@m@d@H','2:00:00'),
@@ -72,6 +75,25 @@ def prep():
     join = '/temp/job@Y@m@d@H.join'
     dependency = MetaTaskDep('obs_gran')
     return Task(locals())
+
+class MySerialTask(Task):
+    def __init__(self, d):
+        self.account = 'myproject'
+        self.cores = '1'
+        self.memory = '2G'
+        self.walltime = '00:10:00'
+        self.queue = 'serialqueue'
+        super().__init__(d)
+
+
+@flow.task()
+def prep():
+    name = 'my_serial'
+    cycledefs = hourly
+    command = '/runcommand'
+    jobname = 'jobname_@Y@m@d@H'
+    join = '/temp/job@Y@m@d@H.join'
+    return MySerialTask(locals())
 
 
 if __name__ == '__main__':
