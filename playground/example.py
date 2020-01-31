@@ -13,7 +13,7 @@ HOME='/myhome'
 hourly = flow.define_cycle('hourly','0 * * * * *')
 bidaily = flow.define_cycle('bidaily','0 0,12 * * * *', activation_offset='-00:00:05') # specify, name of definition, definition, and other optional attributes
 
-
+# set up defaults for a type of task so I don't have to repeat settings
 class MySerialTask(Task):
     def __init__(self, *args):
         self.account = 'myproject'

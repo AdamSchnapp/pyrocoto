@@ -291,6 +291,7 @@ class Task:
     # validate and track class meta data
     # note: validated data attributes are added to self._validated by the validators
     name = String()  # tasks added to workflow should have unique name
+    metatask_name = String()
     jobname = String()
     command = String(contains='/')
     join = String(contains='/')
@@ -300,6 +301,7 @@ class Task:
     walltime = String(contains=':')
     maxtries = String()
     queue = String()
+    partition = String()
     native = String()
     cores = String()
     envar = Envar()
@@ -325,8 +327,10 @@ class Task:
                 'command',
                 'join',
                 'stderr',
+                'stdout',
                 'account',
                 'queue',
+                'partition',
                 'memory',
                 'walltime',
                 'cores',
@@ -490,18 +494,6 @@ class TimeDep(Dependency):
             E = _cyclestr(E)
         self.elm = E
 
-
-class TimeDep(Dependency):
-    def __init__(self, time):
-        if not isinstance(time, str) and not isinstance(time, Offset):
-            raise TypeError(f'Expected time to be type str or Offset, but was {type(time)}')
-        if isinstance(time, Offset):
-            E = time.to_element('timedep')
-        else:
-            E = Element('timedep')
-            E.text = time
-            E = _cyclestr(E)
-        self.elm = E
 
 class TagDep(Dependency):
     ''' provide mechanism for user to specify the tag 'sh' or 'rb'
