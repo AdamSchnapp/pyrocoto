@@ -410,7 +410,7 @@ class Task:
                     elm_task.append(to_element(V, Ename))
         if hasattr(self, 'meta'):
             if hasattr(self, 'metatask_name'):
-                E_metatask = Element('metatask', metatask_name=self.metatask_name)
+                E_metatask = Element('metatask', name=self.metatask_name)
             else:
                 E_metatask = Element('metatask')
             for k, v in self.meta.items():
