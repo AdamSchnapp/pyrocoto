@@ -331,7 +331,6 @@ class Task:
                 'account',
                 'queue',
                 'partition',
-                'memory',
                 'walltime',
                 'cores',
                 'nodes',
