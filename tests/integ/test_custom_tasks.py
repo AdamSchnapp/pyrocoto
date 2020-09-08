@@ -1,5 +1,5 @@
 import pytest
-from pyrocoto import Workflow, Task, Offset, DataDep
+from pyrocoto import Workflow, Task, Offset, DataDep, TaskDep
 import os
 from distutils import dir_util
 
@@ -54,7 +54,7 @@ class MySerialTask(Task):
 
 def test_mytasks_workflow(data_dir, request):
 
-    flow = Workflow()
+    flow = Workflow(_shared=False)
     hourly = flow.define_cycle('hourly','0 * * * * *')
 
     bunch_of_args = ['thing1', 'thing2', 'thing3']
@@ -68,16 +68,52 @@ def test_mytasks_workflow(data_dir, request):
             join = f'/task1_@Y@m@d@H_{arg}.join'
             dependency = DataDep(f'file_needed_for_{arg}')
             return MySerialTask(locals())
-        
+
 
     flow.set_log('log_task.@Y@m@d@H')
 
     wf_name = request.node.name[5:]
     wf_file = f'{wf_name}.xml'
     flow.write_xml(str(data_dir.join(wf_file)))
-    
+
     validationfile = f'{wf_name}.validate'
     with open(validationfile) as f, open(wf_file) as f2:
         assert  f.read() == f2.read()
 
+def test_shared_workflow(data_dir, request):
 
+    flow = Workflow()
+    hourly = flow.define_cycle('hourly','0 * * * * *')
+
+    @flow.task()
+    def task1():
+        name = 'task1'
+        cycledefs = hourly
+        command = '/runcommand @Y@m@d@H'
+        jobname = 'task1_@Y@m@d@H'
+        join = '/task1_@Y@m@d@H.join'
+        dependency = DataDep('file_needed')
+        return MySerialTask(locals())
+
+    flow = Workflow()
+    print(flow.tasks)
+
+    @flow.task()
+    def task2():
+        name = f'task2'
+        cycledefs = 'hourly'
+        command = '/runcommand @Y@m@d@H'
+        jobname = 'task2_@Y@m@d@H'
+        join = '/task2_@Y@m@d@H_{arg}.join'
+        dependency = TaskDep('task1')
+        return MySerialTask(locals())
+
+    flow.set_log('log_task.@Y@m@d@H')
+
+    wf_name = request.node.name[5:]
+    wf_file = f'{wf_name}.xml'
+    flow.write_xml(str(data_dir.join(wf_file)))
+
+    validationfile = f'{wf_name}.validate'
+    with open(validationfile) as f, open(wf_file) as f2:
+        assert  f.read() == f2.read()

@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!DOCTYPE workflow []>
+<workflow realtime="T" scheduler="lsf">
+    <log>
+        <cyclestr>log_task.@Y@m@d@H</cyclestr>
+    </log>
+    <cycledef group="hourly">0 * * * * *</cycledef>
+    <task name="task1" cycledefs="hourly" maxtries="2">
+        <jobname>
+            <cyclestr>task1_@Y@m@d@H</cyclestr>
+        </jobname>
+        <command>
+            <cyclestr>/runcommand @Y@m@d@H</cyclestr>
+        </command>
+        <join>
+            <cyclestr>/task1_@Y@m@d@H.join</cyclestr>
+        </join>
+        <account>myproject</account>
+        <queue>queue_for_my_serial_task</queue>
+        <walltime>00:10:00</walltime>
+        <cores>1</cores>
+        <memory>2G</memory>
+        <dependency>
+            <datadep>file_needed</datadep>
+        </dependency>
+    </task>
+    <task name="task2" cycledefs="hourly" maxtries="2">
+        <jobname>
+            <cyclestr>task2_@Y@m@d@H</cyclestr>
+        </jobname>
+        <command>
+            <cyclestr>/runcommand @Y@m@d@H</cyclestr>
+        </command>
+        <join>
+            <cyclestr>/task2_@Y@m@d@H_{arg}.join</cyclestr>
+        </join>
+        <account>myproject</account>
+        <queue>queue_for_my_serial_task</queue>
+        <walltime>00:10:00</walltime>
+        <cores>1</cores>
+        <memory>2G</memory>
+        <dependency>
+            <taskdep task="task1"/>
+        </dependency>
+    </task>
+</workflow>

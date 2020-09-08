@@ -1,7 +1,7 @@
 from setuptools import setup
 
 url = ""
-version = "0.2.1"
+version = "0.2.2"
 readme = open('README.rst').read()
 
 setup(

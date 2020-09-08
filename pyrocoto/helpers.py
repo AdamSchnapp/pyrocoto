@@ -29,3 +29,10 @@ class Validator(ABC):
         ''' validate method can accept (null return), augment (return augmented)
         or raise an error'''
         pass
+
+
+class Borg:
+    _shared_state = {}
+
+    def __init__(self):
+        self.__dict__ = self._shared_state

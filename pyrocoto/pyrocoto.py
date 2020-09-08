@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from xml.etree.ElementTree import Element, tostring
 from xml.dom import minidom
-from .helpers import Validator
+from .helpers import Validator, Borg
 from itertools import product
 import logging
 
@@ -130,17 +130,25 @@ class Cycledefs(Validator):
         self.isin = contains
 
     def validate(self, value):
-        ''' return list of cycledefs if not already '''
+        ''' return list of cycle definition group names (strings) '''
+        if isinstance(value, str):
+            return [value]
         if isinstance(value,  CycleDefinition):
-            return([value])
+            return [value.group]
         if isinstance(value, list):
-            for i in value:
-                if not isinstance(i, CycleDefinition):
-                    msg = f'Expected CycleDefinition, but got {type(i)}'
+            def_list = list()
+            for v in value:
+                if isinstance(v, CycleDefinition):
+                    def_list.append(v.group)
+                elif isinstance(v, str):
+                    def_list.append(v)
+                else:
+                    msg = f'Expected CycleDefinition or string, but got {type(v)}'
                     raise TypeError(msg)
-        if not isinstance(value, list):
-            raise TypeError(f'Expected Cycledefs value {value!r} to'
-                            'be CycleDefinition or list of CycleDefinitions\n')
+            return def_list
+
+        raise TypeError(f'Expected Cycledefs value {value!r} to '
+                        'be CycleDefinition or list of CycleDefinitions/strings\n')
 
 
 class CycleDefinition():
@@ -155,11 +163,9 @@ class CycleDefinition():
 
     def __eq__(self, other):
         if isinstance(other, CycleDefinition):
-            if self.group == other.group:
-                return True
-            else:
-                return (self.definition == other.definition and
-                        self.activation_offset == other.activation_offset)
+            return (self.group == other.group and
+                    self.definition == other.definition and
+                    self.activation_offset == other.activation_offset)
         else:
             return False
 
@@ -190,29 +196,36 @@ def _cyclestr(element):
     return element
 
 
-class Workflow(object):
+class Workflow(Borg):
     ''' Implement an abstarction layer on top of rocoto workflow management engine
         The WorkFlow class will serve as a central object that registers all units of work
         (tasks) for any number of desired cycle definitions.
+        Workflow objects share state.
     '''
 
-    def __init__(self, realtime='T', scheduler='lsf', **kwargs):
-        self.tasks = []
-        self.task_names = set()  # set of unique task names, metatasks are expended.
-        self.metatask_names = set()
-        self.cycle_definitions = []  # this is a list so that iteration is deterministic
+    def __init__(self, realtime='T', scheduler='lsf', _shared=True, **kwargs):
+        if _shared:
+            Borg.__init__(self)
+        if not hasattr(self, 'tasks'):
+            self.tasks = []
+            self.task_names = set()  # set of unique task names, metatasks are expended.
+            self.metatask_names = set()
+            self.cycle_definitions = dict()
 
-        self.workflow_element = Element('workflow', realtime=realtime,
-                                        scheduler=scheduler, **kwargs)
-        self.log_element = None
+            self.workflow_element = Element('workflow', realtime=realtime,
+                                            scheduler=scheduler, **kwargs)
+            self.log_element = None
 
     def define_cycle(self, group, definition, activation_offset=None):
         cycledef = CycleDefinition(group, definition, activation_offset)
-        print(f'adding cycle {group}')
-        if cycledef in self.cycle_definitions:
-            raise ValueError('cannot add cycle with same group name')
-        self.cycle_definitions.append(cycledef)
-        return cycledef
+        if group in self.cycle_definitions:
+            if cycledef == self.cycle_definitions[group]:
+                return cycledef
+            else:
+                raise ValueError('cannot add different cycle definition with same group name')
+        else:
+            self.cycle_definitions[cycledef.group] = cycledef
+            return cycledef
 
     def set_log(self, logfile):
         log = Element('log')
@@ -231,12 +244,27 @@ class Workflow(object):
                         n = elm.attrib['metatask']
                         raise ValueError(f'Metatask dependency {repr(n)} is not in workflowa')
 
+    def _validate_task_cycles(self, task):
+        for cycledef in task.cycledefs:
+            if cycledef not in self.cycle_definitions:
+                raise ValueError(f'cycle definition "{cycledef}" not in workflow')
+
     def add_task(self, task):
         task._validate()  # will raise error if eggregate of task info appears to have issues
         self._validate_task_dependencies(task)  # will raise errors if task dependency issues
-        for cycledef in task.cycledefs:
-            if cycledef not in self.cycle_definitions:
-                self.cycle_definitions.append(cycledef)
+        self._validate_task_cycles(task)  # will raise errors if task cycle issues
+#        for cycledef in task.cycledefs:
+#            if isinstance(cycledef, str):
+#                if cycledef in self.cycle_definitions:
+#                    continue
+#                else:
+#                    raise ValueError(f'cycle with group name {cycledef} does not exist')
+#            if isinstance(cycledef, CycleDefinition):
+#                if cycledef.group not in self.cycle_definitions:
+#                    self.cycle_definitions[cycledef.group] = cycledef
+#                continue
+#            else:
+#                raise ValueError(f'{cycledef} is not a cycle definition')
         self.tasks.append(task)
         if not self.task_names.isdisjoint(task.task_names):  # if intersection
             raise ValueError(f'Task names must be unique; Error adding task {repr(task.name)}')
@@ -273,7 +301,7 @@ class Workflow(object):
         xml = self.workflow_element
         xml.append(self.log_element)
 
-        for cycledef in self.cycle_definitions:
+        for cycledef in self.cycle_definitions.values():
             E = cycledef._generate_xml()
             xml.append(E)
 
@@ -390,7 +418,7 @@ class Task:
     def _generate_xml(self):
         ''' Convert task's metadata into a Task rocoto XML element '''
         task_attrs = {'name': self.name,
-                      'cycledefs': ','.join([x.group for x in self.cycledefs]),
+                      'cycledefs': ','.join([x for x in self.cycledefs]),
                       'maxtries': self.maxtries}
 #        task_attrs['name']
         elm_task = Element('task', task_attrs)
@@ -501,7 +529,7 @@ class TagDep(Dependency):
         E = Element(tag)
         E.text = text
         self.elm = E
-        
+
 
 def product_meta(dict_in):
     if not isinstance(dict_in, dict):

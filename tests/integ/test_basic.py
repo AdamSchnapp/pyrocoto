@@ -41,9 +41,9 @@ def data_dir(tmpdir, request):
 
 def test_minimal_workflow(data_dir, request):
 
-    flow = Workflow()
+    flow = Workflow(_shared=False)
     hourly = flow.define_cycle('hourly','0 * * * * *')
-    
+
     @flow.task()
     def task1():
         name = 'task1'
@@ -61,7 +61,7 @@ def test_minimal_workflow(data_dir, request):
     wf_name = request.node.name[5:]
     wf_file = f'{wf_name}.xml'
     flow.write_xml(str(data_dir.join(wf_file)))
-    
+
     validationfile = f'{wf_name}.validate'
     with open(validationfile) as f, open(wf_file) as f2:
         assert  f.read() == f2.read()
@@ -69,10 +69,10 @@ def test_minimal_workflow(data_dir, request):
 
 def test_task2_workflow(data_dir, request):
 
-    flow = Workflow()
+    flow = Workflow(_shared=False)
     hourly = flow.define_cycle('hourly','0 * * * * *')  # once/hour at top of hour
     min15 = flow.define_cycle('min15','15,30,45 * * * * *')  # at 15,30, and 45 minutes after top of hour
-    
+
     @flow.task()
     def task2():
         name = 'task2'
@@ -97,7 +97,7 @@ def test_task2_workflow(data_dir, request):
     print(wf_name)
     wf_file = f'{wf_name}.xml'
     flow.write_xml(str(data_dir.join(wf_file)))
-    
+
     validationfile = f'{wf_name}.validate'
     with open(validationfile) as f, open(wf_file) as f2:
         assert  f.read() == f2.read()
