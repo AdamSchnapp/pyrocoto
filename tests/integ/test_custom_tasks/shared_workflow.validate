@@ -24,7 +24,7 @@
             <datadep>file_needed</datadep>
         </dependency>
     </task>
-    <task name="task2" cycledefs="hourly" maxtries="2">
+    <task name="task2" cycledefs="hourly" maxtries="2" final="true">
         <jobname>
             <cyclestr>task2_@Y@m@d@H</cyclestr>
         </jobname>

@@ -9,8 +9,9 @@ logger = logging.getLogger(__name__)
 
 
 class String(Validator):
-    def __init__(self, contains=None):
+    def __init__(self, contains=None, one_of=None):
         self.isin = contains
+        self.one_of = one_of
 
     def validate(self, value):
         if isinstance(value, Offset):
@@ -22,6 +23,10 @@ class String(Validator):
         if self.isin is not None:
             if self.isin not in value:
                 raise ValueError(f'Expected {self.isin} in "{name}" value {repr(value)}')
+
+        if self.one_of is not None:
+            if value not in self.one_of:
+                raise ValueError(f'Expected "{value}" to be one of {self.one_of}')
 
 
 class Offset:
@@ -321,7 +326,7 @@ class Task:
     name = String()  # tasks added to workflow should have unique name
     metatask_name = String()
     jobname = String()
-    command = String(contains='/')
+    command = String()
     join = String(contains='/')
     stderr = String(contains='/')
     account = String()
@@ -336,9 +341,11 @@ class Task:
     meta = Meta()
     cycledefs = Cycledefs()
     dependency = IsDependency()
+    final = String(one_of=['true', 'false'])
 
     defaults = {'maxtries': '2',
-                'walltime': '20:00'}
+                'walltime': '20:00',
+                'final': 'false'}
 
     # Specify required metadata, multiple entries indicates atleast one of is required
     # I.E atleast one of 'join' or 'stderr' is required
@@ -417,9 +424,12 @@ class Task:
 
     def _generate_xml(self):
         ''' Convert task's metadata into a Task rocoto XML element '''
-        task_attrs = {'name': self.name,
-                      'cycledefs': ','.join([x for x in self.cycledefs]),
-                      'maxtries': self.maxtries}
+        task_attrs = dict()
+        task_attrs['name'] = self.name
+        task_attrs['cycledefs'] = ','.join([x for x in self.cycledefs])
+        task_attrs['maxtries'] = self.maxtries
+        if self.final == 'true':
+            task_attrs['final'] = self.final
 #        task_attrs['name']
         elm_task = Element('task', task_attrs)
         for attr in self._for_xml:

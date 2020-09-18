@@ -102,6 +102,7 @@ def test_shared_workflow(data_dir, request):
     def task2():
         name = f'task2'
         cycledefs = 'hourly'
+        final = 'true'
         command = '/runcommand @Y@m@d@H'
         jobname = 'task2_@Y@m@d@H'
         join = '/task2_@Y@m@d@H_{arg}.join'

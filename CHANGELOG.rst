@@ -4,6 +4,17 @@
 This project uses `semantic versioning <http://semver.org/>`_.
 This change log uses principles from `keep a changelog <http://keepachangelog.com/>`_.
 
+0.2.3
+------------
+
+Added
+^^^^^
+* Added support for the "final" attribute.
+  According to `rocoto documentation <http://christopherwharrop.github.io/rocoto/>`
+  "The final attribute allows you to designate one or more tasks as "final" tasks.
+  A final task is a task that will, upon successful completion, cause the entire cycle
+  to be considered complete and deactivated."
+
 0.2.2
 ------------
 
