@@ -372,7 +372,9 @@ class Task:
                 'native',
                 'memory',
                 'envar',
-                'dependency']
+                'dependency',
+                'nodesize',
+               ]
 
     def __init__(self, d):
         # set some defaults if not already set

@@ -83,6 +83,7 @@ def test_task2_workflow(data_dir, request):
                  'SETTING2': 'NO',
                  'YESTERDAY': Offset('@Y@m@d','-24:00:00')}
         nodes = '10:ppn=4'  # request 4 cores on each of 10 nodes
+        nodesize = '4'
         queue = 'queue'
         account = 'my_account'
         native = '-setting_to_pass_to_scheduler_that_rocoto_may_not_support'

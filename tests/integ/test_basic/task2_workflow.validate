@@ -35,5 +35,6 @@
                 <cyclestr offset="-24:00:00">@Y@m@d</cyclestr>
             </value>
         </envar>
+        <nodesize>4</nodesize>
     </task>
 </workflow>

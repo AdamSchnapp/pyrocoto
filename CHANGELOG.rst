@@ -4,6 +4,13 @@
 This project uses `semantic versioning <http://semver.org/>`_.
 This change log uses principles from `keep a changelog <http://keepachangelog.com/>`_.
 
+0.2.4
+------------
+
+Added
+^^^^^
+* Added support for the "nodesize" attribute.
+
 0.2.3
 ------------
 
