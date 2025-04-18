@@ -540,7 +540,7 @@ class TagDep(Dependency):
     def __init__(self, tag, text):
         E = Element(tag)
         E.text = text
-        self.elm = E
+        self.elm = _cyclestr(E)
 
 
 def product_meta(dict_in):
